@@ -1,0 +1,152 @@
+Friday 23rd September, 2016
+---------------------------
+Trying to see if using rhs or huss makes a difference to evolving theta
+over 1901-2012. Differences at high latitudes in annual mean, but may not matter for vegetation.
+Soil water 30-yr anomaly over 1901-2012 very similar with either huss or rhs. With rhs less increase in far north. So, use rhs for now as this does not seem to be related to any particular time in the day, so presumably is 24-hr.
+Time for the run = 53 minutes. 4 minutes for 1st decade alone.
+Next put in 8 soil layers and more detailed soil water movement.
+
+Tuesday 27th September, 2016
+----------------------------
+Seems to be working with basic 8-layer soil. How long to spin-up? Do a test for a few points.
+How long does a Sahara point, for example, take to lose all its soil water if it starts at capacity? Will need to add single-point and spin-up code wrappers. Use restarts as well.
+Possible to use lon_s/lat_s and lon_c/lat_c to specify a small region for an interactive run? Promising...
+Try...
+HF:
+lon_s = 
+lat_s = 
+counts = 1
+Lower layer suddendly goes very low and then back up in three days. Why? Need shorter timestep? Well, f (nlayers) should be set to 0. Do that and run again.
+OK, still problem as layer above goes to 0 water. Try shorter timestep: 30 minutes. That has definitely sorted it!
+Have to change lat for reading as a_lat and b_lat wrong way up.
+For HF, takes about 450 days to get there from theta_m.
+How about Sahara desert? Takes about  from theta_s.
+Say 0oW; 20oN. 0.42 to 0.26 after 10 yr. Same after another 10 yr, so maybe at equilirium? Looks like it.
+And Cambridge: about 1600 days (4 yr). So, just assume OK within the first 10 yr of the century run. Do Century run now, global.
+
+Wednesday
+Seems to be working really well. Took 1 hr 54 mins for 1901-2012.
+Put output in ayx_1.
+Why soil water in great lakes? All points in GL have soil texture in hwsd file. What about theta files? Have values there as well. So need to sort this out. Look at actual lat and lon values. not good, so improving reading routines to account for lat_s etc.
+OK, is a mystery. Great Lakes seem to have soil texture and theta values. Leave for now.
+
+First decade now taking 500s (8.3 min) on processor 0, but 10 min on slurm. This means 112 yr should take 112 minutes (i.e. 1 h2 52 s).
+
+1. Read through code and make nice for David.
+
+Think I can remove f_inf. Do test of doing this in HF:
+3652  0.3846186      0.0000000E+00
+3652  0.3859738      0.0000000E+00
+Different! Rounding error?
+NISURF was not set. Now get:
+3652  0.2813740
+
+Re-do global run. Running now, but 15:49 for first decade. Why such a big increase in runtime?
+NISURF = 48; runtime = 23:19
+NISURF =  1; runtime = 19:25
+So, not the actual computation that takes the time! Good! What is it? Switch off ayx netcdf outputs: 16:49. So doing very little but taking very long! Try stopping other things:
+No climate reads: 3:14
+just tas: 2:15
+and ps: 4:23
+and pr: 3:34
+and rhs: 4:30
+and huss: 4:49
+So, what is going on?
+Go back to 48 steps: 8:47 only!
+Add back ayz writes: 20:21. So, most of time ayx outs. Great!
+Fixed problem with fort.80 and new lat and lon to ayx outs.
+Now time: 6:45! Really OK?
+Now 8:48 for 10 yr and seems OK!
+Fixed lon/lat coordinates in ayx files: 18:14
+With two decades: 18:41, so only slightly longer!
+Reverse lon/lat order in diagnostic array and see if map OK in panoply.
+
+2. underground runoff
+3. test for known location soil water through yr. where? HF?
+4. plant growth
+
+Friday 4th November, 2016
+-------------------------
+Was not running, but now seems fine. Was problem with memory. Now, first decade only taking 
+
+Thursday 17th November, 2016
+----------------------------
+Set up GitHub to save and share H9.
+Looking at how to do this here: https://help.github.com/articles/set-up-git/
+Open Terminal applicaton on Darwin? Seems to work!
+My name: adfriend45
+
+Seemed to work:
+git config --global user.name "adfriend45"
+git config --global user.email "adf10@cam.ac.uk"
+GitHub password: v...
+Clone with HTTPS.
+Using browser:
+Next, Create a repository with readme.md
+Added some content to readme.md
+
+OK, I really do not understand how to use GitHub, especially the relationship between the command-line stuff and the browser stuff. Need to read until feel know it.
+
+Using tried:
+H9/SOURCE/git init
+responded:
+Initialized empty Git repository in /home/adf10/MODELS/H9/SOURCE/.git/
+
+Now need to put the code in the repo I created before: adfriend45/HYBRID9
+I assume this is 'push an existing repository from the command line'.
+Trying:
+H9/SOURCE/git remote add origin https://github.com/adfriend45/HYBRID9.git
+
+OK, nothing happened, no error, not password request.
+Next:
+H9/SOURCE/git add --all
+H9/SOURCE/git commit -m 'adding my files to my repository'
+Did lots of stuff!
+Now:
+H9/SOURCE/git push -u origin master
+Gives error. Forbidden.
+
+Try again as new repository from command line:
+
+Friday 21st November, 2016
+---------------------------
+Start with the simplest thing:
+https://guides.github.com/activities/hello-world/
+Done, seems OK.
+Now clone this to Darwin using method in
+https://www.linux.com/learn/beginning-git-and-github-linux-users
+
+git clone https://github.com/adfriend45/hello-world
+
+Worked fine. Need to work out how to sync Darwin H9 code into GitHub next.
+First, following the instructions on the last link in Darwin. checkout to make a new branch.
+
+/home/adf10/git-repos/hello-world/git checkout -b test
+git status
+git add README.md
+git commit README.md
+git push origin test
+failed! aha, problem we had before! Need to add my Darwin account as user to GitHub repository?
+
+Looks like I need to change .git/config to use ssh:
+http://stackoverflow.com/questions/7438313/pushing-to-git-returning-error-code-403-fatal-http-request-failed
+and then need to add an SSH key for Darwin to my GitHub:
+https://help.github.com/articles/generating-an-ssh-key/
+
+Added a new SSH key on Darwin and put on my GitHub account. Passphrase to push from Darwin v... And works!
+
+Now, set up for HYBRID9. Try pushing H9.f90 there:
+H9/SOURCE/git add H9.f90
+git commit H9.f90
+git push origin HYBRID9
+failed. Need to adjust .git/config as above. How make this general?
+
+Monday 28th November, 2016
+--------------------------
+Work towards fully H9 on GitHub, with version updates and Annemarie and David joining in.
+First, just do some playing with hello-world
+Add some code here, and then move the code to Darwin, then update it on Darwin and put it back in GitHub.
+
+Following required in HYBRID9 repo. on Darwin, in .git/config:
+url=ssh://git@github.com/mynickname/my_repo.gits
+
