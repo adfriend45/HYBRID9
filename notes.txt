@@ -150,3 +150,6 @@ Add some code here, and then move the code to Darwin, then update it on Darwin a
 Following required in HYBRID9 repo. on Darwin, in .git/config:
 url=ssh://git@github.com/mynickname/my_repo.gits
 
+All seems to be working well.
+Runtime for global first decade: 00:09:15
+Has it given some sensible output?
