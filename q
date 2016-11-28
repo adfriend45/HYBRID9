@@ -1,6 +1,6 @@
 cd SOURCE
-make H9.exe
+make HYBRID9.exe
 cd ..
-mv SOURCE/H9.exe EXECUTE
+mv SOURCE/HYBRID9.exe EXECUTE
 cd EXECUTE
-nice -19 ./H9.exe
+nice -19 ./HYBRID9.exe
