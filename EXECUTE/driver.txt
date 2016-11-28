@@ -1,7 +1,7 @@
 48 ! NSURF
  1 ! iDEC_start ( 1 = 1901-1910)
  1 ! iDEC_end   (11 = 2001-2010; 12 = 2011-2012)
-.FALSE. ! INTERACTIVE
+.TRUE. ! INTERACTIVE
  0.0 ! lon_w
 52.5 ! lat_w
    1  ! lon_c_w (count towards east)
