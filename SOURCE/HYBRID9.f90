@@ -1187,10 +1187,10 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
           iY = jyear-((iDEC_start-1)*10+1901)+1
           !------------------------------------------------------------!
-          axy_rnf  (x,y,iY) = rnf_sum  / FLOAT (nt * NISURF)
-          axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF)
+          axy_rnf  (x,y,iY) = rnf_sum  / FLOAT (nt * NISURF) ! mm s-1
+          axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF) ! mm s-1
           !------------------------------------------------------------!
-          axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt)
+          axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt) ! 
           axy_huss (x,y,iY) = huss_sum / FLOAT (nt)
           axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)
           axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)

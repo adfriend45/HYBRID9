@@ -56,6 +56,7 @@ CHARACTER (LEN = *), PARAMETER :: THETAS_NAME = "soil_water_layers"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: LON_UNITS   = "degrees_east"
 CHARACTER (LEN = *), PARAMETER :: LAT_UNITS   = "degrees_north"
+CHARACTER (LEN = *), PARAMETER :: RNF_UNITS   = "mm/s"
 CHARACTER (LEN = *), PARAMETER :: DEPTH_UNITS = "mm"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: UNITS       = "units"
@@ -122,7 +123,7 @@ dimids_three = (/z_dimid,lon_dimid,lat_dimid/)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Define the variables.
+! Define the data variables.
 !----------------------------------------------------------------------!
 CALL CHECK (nf90_def_var(ncid, RNF_NAME  , NF90_float, &
   dimids_two, rnf_varid))
@@ -142,6 +143,12 @@ CALL CHECK (nf90_def_var(ncid, THETA_NAME, NF90_float, &
   dimids_two, theta_varid))
 CALL CHECK (nf90_def_var(ncid, THETAS_NAME, NF90_float, &
   dimids_three, thetaz_varid))
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Assign units attributes to var data.
+!----------------------------------------------------------------------!
+CALL CHECK (NF90_PUT_ATT(ncid, rnf_varid, UNITS, RNF_UNITS))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
