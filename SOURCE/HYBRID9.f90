@@ -623,7 +623,7 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
   WRITE (*,*) 'Opening ',TRIM(file_in_ks)
   CALL CHECK(NF90_OPEN (TRIM (file_in_ks), NF90_NOWRITE, ncid))
   WRITE (*,*) 'File ',TRIM(file_in_ks),' opened'
-  CALL CHECK(NF90_GET_VAR (ncid, 4, k_s_l1_in, &
+  CALL CHECK(NF90_GET_VAR (ncid, 2, k_s_l1_in, &
                        start = (/(lon_s-1)*60+1, (lat_s-1)*60+1 /), &
                        count = (/lon_c*60, lat_c*60 /)))
   WRITE (*,*) 'Saturated hydraulic conductivity read for layer',I
@@ -916,6 +916,8 @@ DO iDEC = iDEC_start, iDEC_end
             ! Hydraulic conductivities at interfaces between layers
             ! based on Eqn. 7.89 of Oleson et al. (2013) (mm s-1).
             ! Refers to bottom of layer.
+write (*,*) k_s (:,x,y)
+stop
             !----------------------------------------------------------!
             DO I = 1, nlayers - 1
               xk (I) = xks * (&
