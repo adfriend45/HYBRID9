@@ -581,14 +581,22 @@ soil_tex (:,:) = data_in_2DI (:,:)
 ! on 22/7/16.
 !----------------------------------------------------------------------!
 DO I = 1, nsoil_layers_max ! Loop over soil layers
-  IF (I == 1) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l1.nc'
-  IF (I == 2) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l2.nc'
-  IF (I == 3) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l3.nc'
-  IF (I == 4) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l4.nc'
-  IF (I == 5) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l5.nc'
-  IF (I == 6) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l6.nc'
-  IF (I == 7) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l7.nc'
-  IF (I == 8) file_in = '/scratch/adf10/DATA/SOILS/theta_s_l8.nc'
+  IF (I == 1) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l1.nc'
+  IF (I == 2) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l2.nc'
+  IF (I == 3) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l3.nc'
+  IF (I == 4) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l4.nc'
+  IF (I == 5) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l5.nc'
+  IF (I == 6) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l6.nc'
+  IF (I == 7) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l7.nc'
+  IF (I == 8) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
+                          theta_s_l8.nc'
   WRITE (*,*) 'Opening ',TRIM(file_in)
   CALL CHECK(NF90_OPEN (TRIM (file_in), NF90_NOWRITE, ncid))
   WRITE (*,*) 'File ',TRIM(file_in),' opened'
@@ -834,6 +842,8 @@ DO iDEC = iDEC_start, iDEC_end
           ! Innermost main loop: over iTIME points in year.
           !------------------------------------------------------------!
           DO iTIME = time_BOY (jyear-1859), time_BOY (jyear+1-1859) - 1
+          !------------------------------------------------------------!
+
             !----------------------------------------------------------!
             ! Local index within decade for time point.
             !----------------------------------------------------------!
