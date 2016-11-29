@@ -43,7 +43,7 @@ REAL :: fillval
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: LON_NAME    = "longitude"
 CHARACTER (LEN = *), PARAMETER :: LAT_NAME    = "latitude"
-CHARACTER (LEN = *), PARAMETER :: DEPTH_NAME  = "layer_depth"
+CHARACTER (LEN = *), PARAMETER :: DEPTH_NAME  = "layer_centre_depth"
 CHARACTER (LEN = *), PARAMETER :: RNF_NAME    = "runoff"
 CHARACTER (LEN = *), PARAMETER :: EVAP_NAME   = "evaporation"
 CHARACTER (LEN = *), PARAMETER :: TAS_NAME    = "temperature"
@@ -54,10 +54,18 @@ CHARACTER (LEN = *), PARAMETER :: RHS_NAME    = "relative_humidity"
 CHARACTER (LEN = *), PARAMETER :: THETA_NAME  = "soil_water"
 CHARACTER (LEN = *), PARAMETER :: THETAS_NAME = "soil_water_layers"
 !----------------------------------------------------------------------!
-CHARACTER (LEN = *), PARAMETER :: LON_UNITS   = "degrees_east"
-CHARACTER (LEN = *), PARAMETER :: LAT_UNITS   = "degrees_north"
-CHARACTER (LEN = *), PARAMETER :: RNF_UNITS   = "mm/s"
-CHARACTER (LEN = *), PARAMETER :: DEPTH_UNITS = "mm"
+CHARACTER (LEN = *), PARAMETER :: LON_UNITS        = "degrees_east"
+CHARACTER (LEN = *), PARAMETER :: LAT_UNITS        = "degrees_north"
+CHARACTER (LEN = *), PARAMETER :: RNF_UNITS        = "mm/s"
+CHARACTER (LEN = *), PARAMETER :: EVAP_UNITS       = "mm/s"
+CHARACTER (LEN = *), PARAMETER :: TAS_UNITS        = "K"
+CHARACTER (LEN = *), PARAMETER :: HUSS_UNITS       = "kg[water]/kg[air]"
+CHARACTER (LEN = *), PARAMETER :: PS_UNITS         = "Pa"
+CHARACTER (LEN = *), PARAMETER :: PR_UNITS         = "kg/m^2/s"
+CHARACTER (LEN = *), PARAMETER :: RHS_UNITS        = "percent"
+CHARACTER (LEN = *), PARAMETER :: THETA_TOTAL_UNITS = "mm"
+CHARACTER (LEN = *), PARAMETER :: THETA_UNITS       = "mm^3/mm^3"
+CHARACTER (LEN = *), PARAMETER :: DEPTH_UNITS       = "mm"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: UNITS       = "units"
 !----------------------------------------------------------------------!
@@ -103,10 +111,6 @@ CALL CHECK (NF90_PUT_ATT(ncid, lat_varid, UNITS, LAT_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, lon_varid, UNITS, LON_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, z_varid  , UNITS, DEPTH_UNITS))
 !----------------------------------------------------------------------!
-! Assign units attributed to variables.
-!----------------------------------------------------------------------!
- ! To be done...
-!----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! The dimids array is used to pass the IDs of the dimensions of the
@@ -146,9 +150,18 @@ CALL CHECK (nf90_def_var(ncid, THETAS_NAME, NF90_float, &
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Assign units attributes to var data.
+! Assign units attributed to variables.
 !----------------------------------------------------------------------!
 CALL CHECK (NF90_PUT_ATT(ncid, rnf_varid, UNITS, RNF_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, evap_varid,UNITS, EVAP_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, tas_varid, UNITS, TAS_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, huss_varid,UNITS, HUSS_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, ps_varid,  UNITS, PS_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, pr_varid,  UNITS, PR_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, rhs_varid, UNITS, RHS_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, theta_varid, &
+                         UNITS,THETA_TOTAL_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, thetaz_varid,UNITS, THETA_UNITS))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
