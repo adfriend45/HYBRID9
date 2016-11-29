@@ -29,7 +29,8 @@ REAL :: start(1025),finish(1025)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-CHARACTER (LEN = 200) :: file_in ! Generic filename.
+CHARACTER (LEN = 200) :: file_in_ts ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_ks ! Soil input filename.
 CHARACTER (LEN = 4) :: ydate ! Character value of jyear for file names.
 !----------------------------------------------------------------------!
 
@@ -574,41 +575,64 @@ soil_tex (:,:) = data_in_2DI (:,:)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Read in soil saturated water contents for this block.
-! Units are cm^3/cm^3. Downloaded to
-! 
+! Read in soil properties for this block.
+! Saturated water contents          , theta_s, are cm^3/cm^3.
+! Saturated hydraulic conductivities, k_s    , are    cm/day.
+! Downloaded to /home/adf10/DATA/SOILS
 ! from http://globalchange.bnu.edu.cn/research/soil4d.jsp#download
 ! on 22/7/16.
 !----------------------------------------------------------------------!
 DO I = 1, nsoil_layers_max ! Loop over soil layers
-  IF (I == 1) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l1.nc'
-  IF (I == 2) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l2.nc'
-  IF (I == 3) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l3.nc'
-  IF (I == 4) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l4.nc'
-  IF (I == 5) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l5.nc'
-  IF (I == 6) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l6.nc'
-  IF (I == 7) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l7.nc'
-  IF (I == 8) file_in = '/scratch/adf10/DATA/SOILS/theta_s/&
-                          theta_s_l8.nc'
-  WRITE (*,*) 'Opening ',TRIM(file_in)
-  CALL CHECK(NF90_OPEN (TRIM (file_in), NF90_NOWRITE, ncid))
-  WRITE (*,*) 'File ',TRIM(file_in),' opened'
+  !--------------------------------------------------------------------!
+  SELECT CASE (I)
+    CASE (1)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l1.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l1.nc'
+    CASE (2)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l2.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l2.nc'
+    CASE (3)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l3.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l3.nc'
+    CASE (4)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l4.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l4.nc'
+    CASE (5)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l5.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l5.nc'
+    CASE (6)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l6.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l6.nc'
+    CASE (7)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l7.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l7.nc'
+    CASE (8)
+      file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l8.nc'
+      file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l8.nc'
+  END SELECT
+  !--------------------------------------------------------------------!
+  WRITE (*,*) 'Opening ',TRIM(file_in_ts)
+  CALL CHECK(NF90_OPEN (TRIM (file_in_ts), NF90_NOWRITE, ncid))
+  WRITE (*,*) 'File ',TRIM(file_in_ts),' opened'
   CALL CHECK(NF90_GET_VAR (ncid, 4, theta_s_l1_in, &
                        start = (/(lon_s-1)*60+1, (lat_s-1)*60+1 /), &
                        count = (/lon_c*60, lat_c*60 /)))
   WRITE (*,*) 'Saturated water contents read for layer',I
   CALL CHECK(NF90_CLOSE (ncid))
   !--------------------------------------------------------------------!
+  WRITE (*,*) 'Opening ',TRIM(file_in_ks)
+  CALL CHECK(NF90_OPEN (TRIM (file_in_ks), NF90_NOWRITE, ncid))
+  WRITE (*,*) 'File ',TRIM(file_in_ks),' opened'
+  CALL CHECK(NF90_GET_VAR (ncid, 4, k_s_l1_in, &
+                       start = (/(lon_s-1)*60+1, (lat_s-1)*60+1 /), &
+                       count = (/lon_c*60, lat_c*60 /)))
+  WRITE (*,*) 'Saturated hydraulic conductivity read for layer',I
+  CALL CHECK(NF90_CLOSE (ncid))
+  !--------------------------------------------------------------------!
   ! Data is at 30 arc-seconds, so grid to half-degree.
   !--------------------------------------------------------------------!
   theta_s_l1 (:,:) = zero
+  k_s_l1     (:,:) = zero
   DO y = 1, lat_c
     DO x = 1, lon_c
       j = 0
@@ -616,23 +640,28 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
         do y1 = (y-1)*60+1,(y-1)*60+60
           IF (theta_s_l1_in (x1,y1) >= zero) THEN
             theta_s_l1 (x,y) =  theta_s_l1 (x,y) + theta_s_l1_in (x1,y1)
+            k_s_l1     (x,y) =  k_s_l1     (x,y) + k_s_l1_in     (x1,y1)
             j = j + 1
           END IF
         END DO
       END DO
       IF (j > 0) THEN
         theta_s_l1 (x,y) = theta_s_l1 (x,y) / FLOAT (j)
+        k_s_l1     (x,y) = k_s_l1     (x,y) / FLOAT (j)
       END IF
     END DO
   END DO
   !--------------------------------------------------------------------!
-  ! Place saturated soil volumetric water contents in block array
-  ! for each layer.
-  ! Read in as cm^3/cm^3 x 0.001, converted to mm.
+  ! Place saturated soil properties in block arrays for each layer.
+  ! Volumetric water contents read in as cm^3/cm^3 x 0.001,
+  ! converted to mm.
+  ! Saturated hydraulic conductivities read in as cm/day,
+  ! converted to mm/s.
   !--------------------------------------------------------------------!
   DO y = 1, lat_c
     DO x = 1, lon_c
       theta_s (I,x,y) = theta_s_l1(x,y) / 1.0E3
+      k_s     (I,x,y) = 10.0 * k_s_l1 (x,y) / 86400.0
     END DO
   END DO
   !--------------------------------------------------------------------!
