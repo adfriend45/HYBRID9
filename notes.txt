@@ -154,3 +154,8 @@ All seems to be working well.
 Runtime for global first decade: 00:09:15
 Has it given some sensible output? Yes, seems fine!
 So, next, add units to all variables.
+
+Tuesday 29th November, 2016
+---------------------------
+Updating WRITE_NET_CDF_3DR.f90 to include units for data variables. Test using interactive run and panoply.
+Works! Put on GitHub for just RNF units first, then do rest.
