@@ -107,22 +107,30 @@ CHARACTER (LEN = 200) :: var_name          ! Generic variable name.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of theta_s of one soil layer read in at
-! 30 arc-seconds (cm3 cm-3).
+! Chunks of soil properties of one soil layer read in at
+! 30 arc-seconds.
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1_in
+REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1_in ! 0.001xcm^3/cm^3
+REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1_in     ! cm/day
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of theta_s of one soil layer gridded to half-degree (cm3 cm-3).
+! Chunks of soil properties of one soil layer gridded to half-degree.
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1
+REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1 ! 0.001xcm^3/cm^-3.
+REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1     ! cm/day.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! Chunk of saturated volumetric soil water (cm3 cm-3).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: theta_s
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Chunk of saturated soil hydralaulic conductivity (mm/s).
+!----------------------------------------------------------------------!
+REAL, DIMENSION (:,:,:), ALLOCATABLE :: k_s
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
