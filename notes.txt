@@ -159,3 +159,31 @@ Tuesday 29th November, 2016
 ---------------------------
 Updating WRITE_NET_CDF_3DR.f90 to include units for data variables. Test using interactive run and panoply.
 Works! Put on GitHub for just RNF units first, then do rest.
+All data variable units now included in diagnostics.
+Next?
+
+(i) Soil texture, conductivity.
+(ii) Slope.
+(iii) Compute LAI and rooting depth.
+(iv) Allow for use of MODIS LAI.
+(v) Energy balance.
+(vi) Stomatal control and C uptake.
+(vii) Rings growth.
+
+(i) At present hydraulic conductivities at layer interfaces is computed from xks, theta, and theta_s using Eqn. 7.89 of olesen13.
+Need xks for each soil layer. Looks to be available from the same source as the saturated water contents we already have:
+http://globalchange.bnu.edu.cn/research/soil4d.jsp#download
+listed as No. 4. 'Saturate hydraulic conductivity of FCH', cm/day.
+Download and read into HYBRID9.f90 and check values for HF.
+As had to register, download all datasets on this page to:
+/home/DATA/BNU
+Then put on Darwin and unzipped.
+Also moved soils data to subd of /SOILS on scratch.
+Before changing anything, save decade output in /save1
+Changed file selection for soil properties to work as CASE.
+
+Wednesday 30th November, 2016
+-----------------------------
+Saturated hydraulic conductivity file not being read. Need to make this work next. Values in native netCDF file look OK > range from 0.5 to 488.3 cm/day, with mean of 61.1 cm/day for top layer (i.e. 0.0071 mm/s; valued used at moment is 0.0038 mm/s, so of similar magnitude, which is encouraging).
+k_s files are exactly twice the size of the theta_s files.
+OK, so looks like it worked using '4' as the varid.
