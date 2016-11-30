@@ -213,6 +213,10 @@ REAL :: rnf
 !----------------------------------------------------------------------!
 REAL :: w0,w1
 !----------------------------------------------------------------------!
+! Saturated hydraulic conductivity at soil layer interface      (mm s-1).
+!----------------------------------------------------------------------!
+REAL :: k_s_int
+!----------------------------------------------------------------------!
 ! Underground runoff from each soil layer                      (mm s-1).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: rnff
@@ -248,10 +252,6 @@ REAL, DIMENSION (:), ALLOCATABLE :: xk
 ! Truncation limit for numerical tests.
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: trunc = 1.0E-8
-!----------------------------------------------------------------------!
-! Saturated hydraulic conductivity from Zeng and Decker        (mm s-1).
-!----------------------------------------------------------------------!
-REAL, PARAMETER :: xks = 0.0038
 !----------------------------------------------------------------------!
 ! Conductivity for underground runoff, xkud from GHY           (mm s-1).
 !----------------------------------------------------------------------!
@@ -924,7 +924,13 @@ DO iDEC = iDEC_start, iDEC_end
             ! Refers to bottom of layer.
             !----------------------------------------------------------!
             DO I = 1, nlayers - 1
-              xk (I) = xks * (&
+              !--------------------------------------------------------!
+              ! Compute saturated hydraulic conductivity at the
+              ! interface as mean of the two layers (mm/s).
+              !--------------------------------------------------------!
+              k_s_int = 0.5 * (k_s (I,x,y) + k_s (I+1,x,y))
+              !--------------------------------------------------------!
+              xk (I) = k_s_int * (&
                 (0.5 * (theta   (I,x,y) + theta   (I+1,x,y))) / &
                 (0.5 * (theta_s (I,x,y) + theta_s (I+1,x,y))) &
                              ) &
@@ -932,7 +938,7 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               ! Impose limits just to be sure.
               !--------------------------------------------------------!
-              xk (I) = MIN (xk (I), xks)
+              xk (I) = MIN (xk (I), k_s_int)
               xk (I) = MAX (zero, xk (I))
               !--------------------------------------------------------!
             END DO
