@@ -113,14 +113,16 @@ CHARACTER (LEN = 200) :: var_name          ! Generic variable name.
 REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1_in ! 0.001xcm^3/cm^3
 REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1_in     ! cm/day
 REAL, DIMENSION (:,:), ALLOCATABLE :: lambda_l1_in  ! 0.001*unitless
+REAL, DIMENSION (:,:), ALLOCATABLE :: psi_l1_in     ! cm
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! Chunks of soil properties of one soil layer gridded to half-degree.
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1 ! 0.001xcm^3/cm^-3.
-REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1     ! cm/day.
-REAL, DIMENSION (:,:), ALLOCATABLE :: lambda_l1  ! 0.001*unitless.
+REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1 ! 0.001xcm^3/cm^-3
+REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1     ! cm/day
+REAL, DIMENSION (:,:), ALLOCATABLE :: lambda_l1  ! 0.001*unitless
+REAL, DIMENSION (:,:), ALLOCATABLE :: psi_l1     ! cm
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -139,6 +141,12 @@ REAL, DIMENSION (:,:,:), ALLOCATABLE :: k_s
 ! Chunk of pore size distribution index (unitless).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: lambda
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Chunk of saturated capillary potential (mm).
+!----------------------------------------------------------------------!
+REAL, DIMENSION (:,:,:), ALLOCATABLE :: psi
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
