@@ -478,18 +478,24 @@ ALLOCATE (axy_evap    (lon_c,lat_c,NYR)) ! Accumulated evap.
 !----------------------------------------------------------------------!
 ALLOCATE (theta       (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
-!  Chunk of theta_s of one soil layer read in at
-! 30 arc-seconds (cm3 cm-3).
+! Chunks of soil properties of one soil layer read in at
+! 30 arc-seconds.
 !----------------------------------------------------------------------!
-ALLOCATE (theta_s_l1_in(lon_c*60,lat_c*60))
+ALLOCATE (theta_s_l1_in(lon_c*60,lat_c*60)) ! cm3 cm-3.
+ALLOCATE (k_s_l1_in    (lon_c*60,lat_c*60)) ! cm day-1.
 !----------------------------------------------------------------------!
-! Chunk of theta_s of one soil layer gridded to half-degree (cm3 cm-3).
+! Chunks of soil properties of one soil layer gridded to half-degree.
 !----------------------------------------------------------------------!
-ALLOCATE (theta_s_l1   (lon_c,lat_c))
+ALLOCATE (theta_s_l1   (lon_c,lat_c)) ! cm3 cm-3.
+ALLOCATE (k_s_l1       (lon_c,lat_c)) ! cm day-1.
 !----------------------------------------------------------------------!
 ! Chunk of saturated volumetric soil water (cm3 cm-3).
 !----------------------------------------------------------------------!
 ALLOCATE (theta_s (nsoil_layers_max,lon_c,lat_c))
+!----------------------------------------------------------------------!
+! Chunk of saturated soil hydraulic conductivity (mm s-1).
+!----------------------------------------------------------------------!
+ALLOCATE (k_s (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ! Chunk of volumetric soil matric potential (cm3 cm-3).
 !----------------------------------------------------------------------!
