@@ -6,8 +6,7 @@ PROGRAM H9
 ! Global simulation of land surface water and carbon fluxes.
 ! Uses PGF forcings, 1901-2012.
 ! Andrew D. Friend
-! 28th November, 2016
-! Just some edits.
+! 30th November, 2016
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -32,6 +31,7 @@ REAL :: start(1025),finish(1025)
 CHARACTER (LEN = 200) :: file_in_ts ! Soil input filename.
 CHARACTER (LEN = 200) :: file_in_ks ! Soil input filename.
 CHARACTER (LEN = 200) :: file_in_lm ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_ps ! Soil input filename.
 CHARACTER (LEN = 4) :: ydate ! Character value of jyear for file names.
 !----------------------------------------------------------------------!
 
@@ -264,7 +264,7 @@ REAL, PARAMETER :: xkud = 2.78E-5 * 1.0E3
 !----------------------------------------------------------------------!
 ! Saturated soil water potential from Zeng and Decker (2009)       (mm).
 !----------------------------------------------------------------------!
-REAL, PARAMETER :: swp_s = -227.0
+!REAL, PARAMETER :: swp_s = -227.0
 !----------------------------------------------------------------------!
 ! End of declarations.
 !----------------------------------------------------------------------!
@@ -485,12 +485,14 @@ ALLOCATE (theta       (nsoil_layers_max,lon_c,lat_c))
 ALLOCATE (theta_s_l1_in(lon_c*60,lat_c*60)) ! 0.001xcm3 cm-3.
 ALLOCATE (k_s_l1_in    (lon_c*60,lat_c*60)) ! cm day-1.
 ALLOCATE (lambda_l1_in (lon_c*60,lat_c*60)) ! 0.001xunitless.
+ALLOCATE (psi_s_l1_in  (lon_c*60,lat_c*60)) ! cm.
 !----------------------------------------------------------------------!
 ! Chunks of soil properties of one soil layer gridded to half-degree.
 !----------------------------------------------------------------------!
 ALLOCATE (theta_s_l1   (lon_c,lat_c)) ! 0.001xcm3 cm-3.
 ALLOCATE (k_s_l1       (lon_c,lat_c)) ! cm day-1.
 ALLOCATE (lambda_l1    (lon_c,lat_c)) ! 0.001xunitless.
+ALLOCATE (psi_s_l1     (lon_c,lat_c)) ! cm.
 !----------------------------------------------------------------------!
 ! Chunk of saturated volumetric soil water (cm3 cm-3).
 !----------------------------------------------------------------------!
@@ -503,6 +505,10 @@ ALLOCATE (k_s (nsoil_layers_max,lon_c,lat_c))
 ! Chunk of soil pore size distribution index (unitless).
 !----------------------------------------------------------------------!
 ALLOCATE (lambda (nsoil_layers_max,lon_c,lat_c))
+!----------------------------------------------------------------------!
+! Chunk of soil saturated capillary/water potential (mm).
+!----------------------------------------------------------------------!
+ALLOCATE (psi_s  (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ! Chunk of volumetric soil matric potential (cm3 cm-3).
 !----------------------------------------------------------------------!
@@ -589,9 +595,10 @@ soil_tex (:,:) = data_in_2DI (:,:)
 
 !----------------------------------------------------------------------!
 ! Read in soil properties for this block.
-! Saturated water contents          , theta_s, are cm^3/cm^3.
+! Saturated water contents          , theta_s, are 0.001*cm^3/cm^3.
 ! Saturated hydraulic conductivities, k_s    , are    cm/day.
-! Soil pore size distribution indices, lambda, are unitless.
+! Pore size distribution indices    , lambda , are 0.001*unitless.
+! Saturated capillary potentials    , psi_s  , are cm.
 ! Downloaded to /home/adf10/DATA/SOILS
 ! from http://globalchange.bnu.edu.cn/research/soil4d.jsp#download
 ! on 22/7/16.
@@ -603,34 +610,42 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l1.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l1.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l1.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l1.nc'
     CASE (2)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l2.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l2.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l2.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l2.nc'
     CASE (3)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l3.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l3.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l3.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l3.nc'
     CASE (4)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l4.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l4.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l4.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l4.nc'
     CASE (5)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l5.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l5.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l5.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l5.nc'
     CASE (6)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l6.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l6.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l6.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l6.nc'
     CASE (7)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l7.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l7.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l7.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l7.nc'
     CASE (8)
       file_in_ts = '/scratch/adf10/DATA/SOILS/theta_s/theta_s_l8.nc'
       file_in_ks = '/scratch/adf10/DATA/SOILS/k_s/k_s_l8.nc'
       file_in_lm = '/scratch/adf10/DATA/SOILS/lambda/lambda_l8.nc'
+      file_in_ps = '/scratch/adf10/DATA/SOILS/psi/psi_s_l8.nc'
   END SELECT
   !--------------------------------------------------------------------!
   WRITE (*,*) 'Opening ',TRIM(file_in_ts)
@@ -660,11 +675,21 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
   WRITE (*,*) 'Soil pore size distribution read for layer',I
   CALL CHECK(NF90_CLOSE (ncid))
   !--------------------------------------------------------------------!
+  WRITE (*,*) 'Opening ',TRIM(file_in_ps)
+  CALL CHECK(NF90_OPEN (TRIM (file_in_ps), NF90_NOWRITE, ncid))
+  WRITE (*,*) 'File ',TRIM(file_in_ps),' opened'
+  CALL CHECK(NF90_GET_VAR (ncid, 4, psi_s_l1_in, &
+                       start = (/(lon_s-1)*60+1, (lat_s-1)*60+1 /), &
+                       count = (/lon_c*60, lat_c*60 /)))
+  WRITE (*,*) 'Soil saturated water potential read for layer',I
+  CALL CHECK(NF90_CLOSE (ncid))
+  !--------------------------------------------------------------------!
   ! Data is at 30 arc-seconds, so grid to half-degree.
   !--------------------------------------------------------------------!
   theta_s_l1 (:,:) = zero
   k_s_l1     (:,:) = zero
   lambda_l1  (:,:) = zero
+  psi_s_l1   (:,:) = zero
   DO y = 1, lat_c
     DO x = 1, lon_c
       j = 0
@@ -674,6 +699,7 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
             theta_s_l1 (x,y) =  theta_s_l1 (x,y) + theta_s_l1_in (x1,y1)
             k_s_l1     (x,y) =  k_s_l1     (x,y) + k_s_l1_in     (x1,y1)
             lambda_l1  (x,y) =  lambda_l1  (x,y) + lambda_l1_in  (x1,y1)
+            psi_s_l1   (x,y) =  psi_s_l1   (x,y) + psi_s_l1_in   (x1,y1)
             j = j + 1
           END IF
         END DO
@@ -682,6 +708,7 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
         theta_s_l1 (x,y) = theta_s_l1 (x,y) / FLOAT (j)
         k_s_l1     (x,y) = k_s_l1     (x,y) / FLOAT (j)
         lambda_l1  (x,y) = lambda_l1  (x,y) / FLOAT (j)
+        psi_s_l1   (x,y) = psi_s_l1   (x,y) / FLOAT (j)
       END IF
     END DO
   END DO
@@ -693,12 +720,15 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
   ! converted to mm/s.
   ! Pore size distribution index read in as 0.001 x unitless,
   ! converted to unitless.
+  ! Saturated water potential read in as cm,
+  ! converted to mm.
   !--------------------------------------------------------------------!
   DO y = 1, lat_c
     DO x = 1, lon_c
       theta_s (I,x,y) = theta_s_l1(x,y) / 1.0E3
       k_s     (I,x,y) = 10.0 * k_s_l1 (x,y) / 86400.0
       lambda  (I,x,y) = lambda_l1 (x,y) / 1.0E3
+      psi_s   (I,x,y) = 10.0 * psi_s_l1 (x,y)
       !----------------------------------------------------------------!
       ! To stop potential dbz.
       !----------------------------------------------------------------!
@@ -994,10 +1024,11 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             DO I = 1, nlayers
               IF (wv (I) < 0.01) THEN
-                h (I) = swp_s * 0.01 ** (-1.0 / lambda (I,x,y)) + zc (I)
+                h (I) = psi_s (I,x,y) * 0.01 ** &
+                        (-1.0 / lambda (I,x,y)) + zc (I)
               ELSE
-                h (I) = swp_s * wv (I) ** (-1.0 / lambda (I,x,y)) + &
-                        zc (I)
+                h (I) = psi_s (I,x,y) * wv (I) ** &
+                        (-1.0 / lambda (I,x,y)) + zc (I)
               END IF
               h (I) = MAX (-1.0E8, h(I))
             END DO
