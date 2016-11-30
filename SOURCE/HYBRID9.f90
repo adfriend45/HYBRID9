@@ -936,7 +936,7 @@ DO iDEC = iDEC_start, iDEC_end
                              ) &
                        ** (2.0 * B + 3.0)
               !--------------------------------------------------------!
-              ! Impose limits just to be sure.
+              ! Impose limits just to be sure (required?).
               !--------------------------------------------------------!
               xk (I) = MIN (xk (I), k_s_int)
               xk (I) = MAX (zero, xk (I))
