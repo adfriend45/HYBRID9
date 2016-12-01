@@ -262,9 +262,7 @@ REAL, PARAMETER :: trunc = 1.0E-8
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: xkud = 2.78E-5 * 1.0E3
 !----------------------------------------------------------------------!
-! Saturated soil water potential from Zeng and Decker (2009)       (mm).
-!----------------------------------------------------------------------!
-!REAL, PARAMETER :: swp_s = -227.0
+
 !----------------------------------------------------------------------!
 ! End of declarations.
 !----------------------------------------------------------------------!
@@ -510,13 +508,14 @@ ALLOCATE (lambda (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ALLOCATE (psi_s  (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
-! Chunk of volumetric soil matric potential (cm3 cm-3).
+! Chunk of minimum volumetric soil matric potential (cm3 cm-3).
 !----------------------------------------------------------------------!
 ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Initialise global diagnostic arrays with fill (i.e. NaN) values.
+! Initialise global diagnostic arrays with fill (i.e. NaN and zero)
+! values.
 !----------------------------------------------------------------------!
 axy_rnf   (:,:,:) = zero / zero
 axy_evap  (:,:,:) = zero / zero
@@ -583,6 +582,7 @@ END IF
 
 !----------------------------------------------------------------------!
 ! Read soil textures for this block.
+! Currently only used to determine soil grid points.
 !----------------------------------------------------------------------!
 file_name = '/scratch/adf10/ISIMIP2/INPUT/SOILS/hwsd.final.hlf.nc4'
 varid = 3
@@ -742,12 +742,17 @@ END DO ! I = 1, nsoil_layers_max ! Loop over soil layers.
 
 !----------------------------------------------------------------------!
 ! Minimum soil volumetric water contents (mm^3 mm^-3).
-! Following is hack for now.
+! Following assumes theta_m is hygroscopic water at -31 bar,
+! Not sure if this is the amount that would stop flow. It is possibly
+! too high.
 !----------------------------------------------------------------------!
 DO y = 1, lat_c
   DO x = 1, lon_c
     DO I = 1, 8
-      theta_m (I,x,y) = theta_s (I,x,y) / 100.0
+      !theta_m (I,x,y) = theta_s (I,x,y) / 100.0
+      ! 
+      theta_m (I,x,y) = theta_s (I,x,y) * ((-3.1E9 / (1000.0 * 9.8)) / &
+                        psi_s (I,x,y)) ** (-lambda (I,x,y))
       ! Initial water in each soil layer (mm^3 mm^-3).
       !theta (I,x,y) = theta_m (I,x,y)
       theta (I,x,y) = theta_s (I,x,y)
@@ -1330,6 +1335,10 @@ DO iDEC = iDEC_start, iDEC_end
     END DO
   END DO
   !--------------------------------------------------------------------!
+
+!write (*,*) theta
+!write (*,*) lambda
+!write (*,*) 1.0/lambda
 
   !--------------------------------------------------------------------!
   ! Free up resources.
