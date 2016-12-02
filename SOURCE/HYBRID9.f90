@@ -234,6 +234,10 @@ REAL, DIMENSION (:), ALLOCATABLE :: wv
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: h
 !----------------------------------------------------------------------!
+! Equilibrium soil matric potentials of soil layers                (mm).
+!----------------------------------------------------------------------!
+REAL, DIMENSION (:), ALLOCATABLE :: h_e
+!----------------------------------------------------------------------!
 ! Soil water fluxes upwards                                    (mm s-1).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: f
@@ -317,6 +321,7 @@ ALLOCATE (zb  (nsoil_layers_max+1))    ! Layer boundaries          (mm).
 ALLOCATE (dz  (nsoil_layers_max))      ! Layer thicknesses         (mm).
 ALLOCATE (zc  (nsoil_layers_max))      ! Layer centres             (mm).
 ALLOCATE (h   (nsoil_layers_max))      ! Water potentials          (mm).
+ALLOCATE (h_e (nsoil_layers_max))      ! Eqm. water potentials     (mm).
 ALLOCATE (theta_sum(nsoil_layers_max)) ! For diagnostics   (mm^3 mm^-3).
 !----------------------------------------------------------------------!
 ! Hydraulic conductivities                                     (mm s-1).
@@ -1040,6 +1045,20 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
+            ! Equilibrium matric potentials of each layer (mm).
+            ! Assumed relationshop from Eqn. 7.86 of
+            ! Oleson et al. (2013), with fixed water table depth of 4 m.
+            ! Requires psi_s at WTD, assume is same as bottom layer for
+            ! now. The WTD depth cancels out for the flux equation, but
+            ! is really needed here for the value of psi_s, but just
+            ! assume is always in bottom layer for now.
+            !----------------------------------------------------------!
+            DO I = 1, nlayers
+              h_e (I) = psi_s (nlayers,x,y) - 4000.0 - zc (I)
+            END DO
+            !----------------------------------------------------------!
+
+            !----------------------------------------------------------!
             ! Soil moisture constraint on evaporative flux (0-1).
             !----------------------------------------------------------!
             beta = MIN (one, wv (1))
@@ -1100,16 +1119,16 @@ DO iDEC = iDEC_start, iDEC_end
 
             !----------------------------------------------------------!
             ! Water fluxes at each layer interface (mm s-1).
-            ! Uses Darcy's Law as in Eqn. 7.116 of Oleson et al. (2013),
-            ! except not (yet) including the Zeng and Decker (2009)
-            ! modification.
+            ! Uses Darcy's Law as in Eqn. 7.116 of Oleson et al. (2013).
             ! Also, to make it positive upwards, denominator is reversed
             ! as z is positive downwards in CLM.
             ! f (I) is the interface at the bottom of layer I, so
             ! f (1) is at the bottom of the first layer.
             !----------------------------------------------------------!
             DO I = 1, nlayers - 1
-              f (I) = -xk (I) * (h (I) - h (I+1)) / (zc (I) - zc (I+1))
+              f (I) = -xk (I) * ((h (I) - h (I+1)) + &
+                      (h_e (I+1) - h_e (I))) / &
+                      (zc (I) - zc (I+1))
             END DO
             !----------------------------------------------------------!
 
@@ -1336,7 +1355,9 @@ DO iDEC = iDEC_start, iDEC_end
   END DO
   !--------------------------------------------------------------------!
 
-!write (*,*) theta
+write (*,*) theta
+write (*,*) h
+write (*,*) h_e
 !write (*,*) lambda
 !write (*,*) 1.0/lambda
 
