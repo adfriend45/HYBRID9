@@ -746,10 +746,18 @@ END DO ! I = 1, nsoil_layers_max ! Loop over soil layers.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
+! Write out saturated water potentials for diagnostics (mm).
+!----------------------------------------------------------------------!
+file_name = 'psi_s.nc'
+WRITE (*,*) 'Writing to ',TRIM(file_name)
+CALL WRITE_NET_CDF_3DR_soils
+!----------------------------------------------------------------------!
+stop
+
+!----------------------------------------------------------------------!
 ! Minimum soil volumetric water contents (mm^3 mm^-3).
 ! Following assumes theta_m is hygroscopic water at -31 bar,
-! Not sure if this is the amount that would stop flow. It is possibly
-! too high.
+! Not sure if this is the amount that would stop flow - too high?
 !----------------------------------------------------------------------!
 DO y = 1, lat_c
   DO x = 1, lon_c
@@ -781,7 +789,6 @@ var_name = 'chunk'
 CALL WRITE_NET_CDF_2DI (block_sub)
 !----------------------------------------------------------------------!
 write (*,*) 'mid = ',my_id,lat_c,lon_c,lat_s,lon_s
-!stop
 !----------------------------------------------------------------------!
 ! Write soil textures for diagnostics.
 !----------------------------------------------------------------------!
@@ -1110,7 +1117,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Underground runoff from each layer               (mm s-1).
             ! Hack for now.
             !----------------------------------------------------------!
-            slope = 0.05
+            slope = 0.00
             DO I = 1, nlayers
               rnff (I) = xk (I) * slope * dz (I) * &
                          theta (I,x,y) / theta_s (I,x,y)
