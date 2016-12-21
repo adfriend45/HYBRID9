@@ -752,7 +752,6 @@ file_name = 'psi_s.nc'
 WRITE (*,*) 'Writing to ',TRIM(file_name)
 CALL WRITE_NET_CDF_3DR_soils
 !----------------------------------------------------------------------!
-stop
 
 !----------------------------------------------------------------------!
 ! Minimum soil volumetric water contents (mm^3 mm^-3).
