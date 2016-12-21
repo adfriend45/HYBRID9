@@ -187,3 +187,58 @@ Wednesday 30th November, 2016
 Saturated hydraulic conductivity file not being read. Need to make this work next. Values in native netCDF file look OK > range from 0.5 to 488.3 cm/day, with mean of 61.1 cm/day for top layer (i.e. 0.0071 mm/s; valued used at moment is 0.0038 mm/s, so of similar magnitude, which is encouraging).
 k_s files are exactly twice the size of the theta_s files.
 OK, so looks like it worked using '4' as the varid.
+Using k_s.
+New global simulation saved in save2. Some differences in soil water profiles evident.
+Global soils data includes lambda, used to get B, so download this dataset and implement in code. 3-hr download so far!
+OK, got it. Put on Darwin and implement in code.
+Saved as /save3. Water in upper layers over Boreal region looks lower. Is everything OK? Reducing slope from 0.05 to 0.01 gets it back up to nice and high values, so need to gradually improve parameterisatios throughout.
+
+Set swp_sat correctly. Get values from BNU and implement: psi. Taking forever to download (from China!). Got it, so implement now.
+
+Done, saved in /save4. Odd things at lower soil layers in some areas. Need to check that next. Was not before these last changes...Occurred between /save2 and /save3, so is related to the implementation of lambda. Need to check that more carefully!
+
+Thursday 1st December, 2016
+---------------------------
+On bike ride realised the problem with strong patterns in lower soil moisture appearing after implementing lambda may well be due to the time integration. Have a look at one point in Southern Africa, and see what values 1/lambda takes there.
+Layer 7 is full of water and layer 8 empty during year 10 in the Kalahari desert at around 23 oW, 22 oS.
+Solved going from NSURF = 96 to NSURF = 172. So, is an integration issue. This is a timestep of about 8 minutes. For interest, do a global run with this and see how long it takes. Took 00:20:35. Still some regions with problems, but reduced. Need to implement the equilibrium profile approach of Zeng & Decker (2009). Work that up once completed the theta_m implementation. Any other hydrology parameters need to be made geographically explicit? Yes, xkud!?
+
+Meanwhile, how set theta_m? This is the residual water content of the soil, left after all flows cease at dry end. How used/set in CLM? Cannot see it there.
+
+Compute theta_m as follows:
+https://en.wikipedia.org/wiki/Water_content defines the remaining water at high tension as 'Residual water content'. Assume this is the same as theta_m. Assume is hygroscopic water at -31 bar as in
+http://www.napavalley.edu/people/ajohnson/Documents/VWT%20132%
+!20Spring%202015/13%20-%20Basic%20Properties%20of%20Soil%20Water%20(171%
+!20-%20203).pdf
+The use:
+http://lawr.ucdavis.edu/classes/ssc107/SSC107Syllabus/chapter2-00.pdf
+to compute -31 bar in mm tension, and then invert equation for psi to give theta_m at -31 bar.
+
+Runned globally and looks fine. Save as /save5.
+
+Friday 2nd December, 2016
+-------------------------
+Added simple Zeng and Decker correction, and saved in /save6. Seems to have removed the oscillation, but absolute values are too low. Perhaps run again with no slope?
+
+Thursday 8th December, 2016
+---------------------------
+Annemarie says some psi_s values are undefined. Need to check that out...
+Add a diagnostic output of global psi_s values in each layer.
+Will need a new subroutine to write a soil 3D diagnostic file on its own. Try and make it completely general.
+Seems OK, but not general yet. psi_s looks OK.
+Next, do a pull of all into new place and check all OK cf. AM's problem.
+
+Wednesday 21st December, 2016
+-----------------------------
+Check everything is working still, and then work on the belowground runoff as AM is working on the water table/ZD correction.
+
+Could not push, so try a pull first.
+
+Both remote and local changed, so did following:
+git commit HYBRID9.f90
+git pull origin master
+
+Seemed to work fine. Now local is same as master.
+Then made changes locally, then:
+git push -u origin master
+not working...
