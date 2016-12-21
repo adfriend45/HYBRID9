@@ -4,7 +4,7 @@ PROGRAM H9
 
 !----------------------------------------------------------------------!
 ! Global simulation of land surface water and carbon fluxes.
-! Uses PGF forcings, 1901-2012.
+! Uses PGF forcings, 1901-2012. test
 ! Andrew D. Friend
 ! 21st December, 2016
 !----------------------------------------------------------------------!
