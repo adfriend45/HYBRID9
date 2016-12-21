@@ -1,0 +1,38 @@
+#Gitignore file taken from https://github.com/github/gitignore/blob/master/C%2B%2B.gitignore
+# added netcdf -output files. This is only relevant until the output files are added to scratch.
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Output files
+*.nc
