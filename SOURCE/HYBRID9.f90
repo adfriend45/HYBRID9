@@ -1017,6 +1017,10 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               lambda_int = 0.5 * (lambda (I,x,y) + lambda (I+1,x,y))
               !--------------------------------------------------------!
+              ! Compute layer interface hydraulic conductivity (mm s-1)
+              ! from saturated value and volumetric soil moistures using
+              ! Eqn. 7.89 of Oleson et al. (2013).
+              !--------------------------------------------------------!
               xk (I) = k_s_int * (&
                 (0.5 * (theta   (I,x,y) + theta   (I+1,x,y))) / &
                 (0.5 * (theta_s (I,x,y) + theta_s (I+1,x,y))) &
