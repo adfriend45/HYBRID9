@@ -242,7 +242,7 @@ REAL, DIMENSION (:), ALLOCATABLE :: xk
 !----------------------------------------------------------------------!
 ! !Water table depth	                                           (mm).
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:), ALLOCATABLE :: wtd  
+REAL, DIMENSION (:), ALLOCATABLE :: zw  
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -923,6 +923,28 @@ DO iDEC = iDEC_start, iDEC_end
               h (I) = MAX (-1.0E8, h(I))
             END DO
             !----------------------------------------------------------!
+           
+            !----------------------------------------------------------!
+            ! Calculation of water table depth zw (mm) based on 
+            ! Abramopoulos et al 1988 and as implemented in modelE 
+            ! Testing for first non-saturated layer from bottom up
+            !----------------------------------------------------------!
+            DO I = nlayers, 1, -1
+               IF(wv(I) < 1) THEN
+                 
+
+
+               
+               END IF
+             I=1
+            END DO
+
+
+
+               
+
+            !----------------------------------------------------------!
+
 
             !----------------------------------------------------------!
             ! Soil moisture constraint on evaporative flux (0-1).
