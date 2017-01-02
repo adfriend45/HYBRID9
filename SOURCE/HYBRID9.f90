@@ -931,6 +931,8 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             DO I = nlayers, 1, -1
                IF(wv(I) < 1) THEN
+                hmat(I) = h(I) - zc(I)
+                zw(I) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
                  
 
 
