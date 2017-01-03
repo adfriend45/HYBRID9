@@ -240,5 +240,32 @@ git pull origin master
 
 Seemed to work fine. Now local is same as master.
 Then made changes locally, then:
-git push -u origin master
-not working...
+git commite <changed files>
+git push -u origin test
+puts them in GitHub test branch,
+then on GitHub merge these into master using 'Compare & pull request'
+All seems OK, not try global run.
+
+Only fully worked once pulled using:
+git pull origin master
+and then changing file and then
+git commit HYBRID9.f90
+and then
+git push -u origin test
+etc.
+
+Global first decade took 11:07.
+Ran, and soil water across layers, but somewhat patch near surface in cold places and deserts.
+
+Now implement belowground runoff properly. How done in CLM?
+TOPMODEL formulation. As I spent so much time doing this for HYBRID8, may as well implment in HYBRID9 as well.
+First, try and get rid of patchy stuff. Remove ZD correction.
+Still just as patchy - looks just the same. Leave for now.
+Use Eqn. 7.168 for drainage.
+
+Thursday 22nd December, 2016
+----------------------------
+Decided that as drainage requires water table depth, and the CLM method looks interesting, should try and develop that while AM looks at the modelE method, and we can then compare them. Also, as HYBRID9 looks rather patchy, I should develop an off-line versio for one point to test new parameterisations, before global runs. Will make analysis much easier. Need a piece of code to get local parameters and forcings from the global set first, and then use these as input, as well as the possibility of simpler input for generic testing, and other input from the site directly.
+
+2017
+Just test
