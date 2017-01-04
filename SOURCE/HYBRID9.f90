@@ -131,7 +131,7 @@ REAL, ALLOCATABLE :: ps (:,:,:)
 !----------------------------------------------------------------------!
 ! Precipitation flux (kg m-2 s-1).
 !----------------------------------------------------------------------!
-REAL, ALLOCATABLE :: pr (:,:,:)
+REAL, ALLOCATABLE ::pr (:,:,:)
 !----------------------------------------------------------------------!
 ! Relative humidity (no units).
 !----------------------------------------------------------------------!
@@ -156,10 +156,10 @@ REAL :: theta_sum_total ! Sum of daily total soil water over 1 yr  (mm).
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: theta_sum (:)
 !----------------------------------------------------------------------!
-!----------------------------------------------------------------------!
 ! soil matric potential for calculating water table                (mm).
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: hmat (:)
+!----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! Miscellaneous variables.
@@ -246,7 +246,7 @@ REAL, DIMENSION (:), ALLOCATABLE :: dz
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: xk
 !----------------------------------------------------------------------!
-! !Water table depth	                                           (mm).
+! Water table depth	                                           (mm).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: zw  
 !----------------------------------------------------------------------!
@@ -474,6 +474,7 @@ ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Accumulated huss.
 ALLOCATE (axy_ps      (lon_c,lat_c,NYR)) ! Accumulated ps.
 ALLOCATE (axy_pr      (lon_c,lat_c,NYR)) ! Accumulated pr.
 ALLOCATE (axy_rhs     (lon_c,lat_c,NYR)) ! Accumulated rhs.
+ALLOCATE (axy_wz      (long_c,lat_c,NYR))! Water table depth.
 !----------------------------------------------------------------------!
 ! Accumulated theta.
 !----------------------------------------------------------------------!
@@ -504,6 +505,9 @@ ALLOCATE (theta_s (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
+! Chunk of water table depth (mm).
+!----------------------------------------------------------------------!
+ALLOCATE (
 
 !----------------------------------------------------------------------!
 ! Initialise global diagnostic arrays with fill (i.e. NaN) values.
@@ -517,6 +521,7 @@ axy_pr    (:,:,:) = zero / zero
 axy_rhs   (:,:,:) = zero / zero
 axy_theta (:,:,:,:) = zero / zero
 axy_theta_total (:,:,:) = zero
+axy_wz (:,:,:) = zero / zero
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -1231,6 +1236,7 @@ DO iDEC = iDEC_start, iDEC_end
           axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)
           axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)
           axy_rhs  (x,y,iY) = rhs_sum  / FLOAT (nt)
+          axy_wz   (x,y,iY) = wz_sum   /  FLOAT (nt)
           !------------------------------------------------------------!
           DO I = 1, nlayers
             axy_theta (I,x,y,iY) = theta_sum (I) / FLOAT (nt)
