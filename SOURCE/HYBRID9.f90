@@ -1235,13 +1235,14 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
           axy_rnf  (x,y,iY) = rnf_sum  / FLOAT (nt * NISURF) ! mm s-1
           axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF) ! mm s-1
+          !axy_zw  (x,y,iY) = wz_sum   / FLOAT (nt * NISURF) ! mm
           !------------------------------------------------------------!
-          axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt) ! 
-          axy_huss (x,y,iY) = huss_sum / FLOAT (nt)
-          axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)
-          axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)
-          axy_rhs  (x,y,iY) = rhs_sum  / FLOAT (nt)
-          axy_wz   (x,y,iY) = wz_sum   /  FLOAT (nt)
+          axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt)          ! K 
+          axy_huss (x,y,iY) = huss_sum / FLOAT (nt)          ! kg kg-1
+          axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)          ! Pa
+          axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)          ! kg m-2 s-1
+          axy_rhs  (x,y,iY) = rhs_sum  / FLOAT (nt)          ! no units
+          axy_wz   (x,y,iY) = wz_sum   /  FLOAT (nt)         ! mm
           !------------------------------------------------------------!
           DO I = 1, nlayers
             axy_theta (I,x,y,iY) = theta_sum (I) / FLOAT (nt)
