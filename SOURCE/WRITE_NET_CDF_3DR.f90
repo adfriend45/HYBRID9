@@ -148,9 +148,9 @@ CALL CHECK (nf90_def_var(ncid, RHS_NAME  , NF90_float, &
 CALL CHECK (nf90_def_var(ncid, THETA_NAME, NF90_float, &
   dimids_two, theta_varid))
 CALL CHECK (nf90_def_var(ncid, THETAS_NAME, NF90_float, &
-  dimids_three, ))
+  dimids_three, thetas_varid ))
 CALL CHECK (nf90_def_var(ncid, WZ_NAME, NF90_float, &
- dimits_two, wz_varid))
+ dimids_two, wz_varid))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
