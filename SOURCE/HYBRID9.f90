@@ -1251,8 +1251,8 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
         END DO ! Loop over years in decade
       END IF ! Soiled grid-box?
-    END DO ! lon_c loop
-  END DO ! lat_c loop
+    END DO ! Loop over lon_c 
+  END DO ! Loop over lat_c 
   !--------------------------------------------------------------------!
 
   !--------------------------------------------------------------------!
@@ -1263,6 +1263,7 @@ DO iDEC = iDEC_start, iDEC_end
   DEALLOCATE (ps)
   DEALLOCATE (pr)
   DEALLOCATE (rhs)
+  DEALLOCATE (wz)
   !--------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
