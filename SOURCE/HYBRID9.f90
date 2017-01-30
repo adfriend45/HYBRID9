@@ -476,7 +476,7 @@ ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Accumulated huss.
 ALLOCATE (axy_ps      (lon_c,lat_c,NYR)) ! Accumulated ps.
 ALLOCATE (axy_pr      (lon_c,lat_c,NYR)) ! Accumulated pr.
 ALLOCATE (axy_rhs     (lon_c,lat_c,NYR)) ! Accumulated rhs.
-ALLOCATE (axy_wz      (long_c,lat_c,NYR))! Water table depth.
+ALLOCATE (axy_wz      (long_c,lat_c,NYR))! Mean yearly water table depth.
 !----------------------------------------------------------------------!
 ! Accumulated theta.
 !----------------------------------------------------------------------!
