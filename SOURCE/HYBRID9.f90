@@ -855,7 +855,7 @@ DO iDEC = iDEC_start, iDEC_end
           rhs_sum  = zero
           theta_sum_total = zero
           theta_sum (:) = zero
-          wz_sum (:)  = zero
+          wz_sum   = zero
           !------------------------------------------------------------!
           ! Innermost main loop: over iTIME points in year.
           !------------------------------------------------------------!
