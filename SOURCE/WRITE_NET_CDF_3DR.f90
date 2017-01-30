@@ -165,7 +165,7 @@ CALL CHECK (NF90_PUT_ATT(ncid, pr_varid,  UNITS, PR_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, rhs_varid, UNITS, RHS_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, theta_varid, &
                          UNITS,THETA_TOTAL_UNITS))
-CALL CHECK (NF90_PUT_ATT(ncid, thetaz_varid,UNITS, THETA_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, thetas_varid,UNITS, THETA_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, wz_varid, UNITS,DEPTH_UNITS))
 !----------------------------------------------------------------------!
 
