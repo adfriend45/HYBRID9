@@ -477,7 +477,7 @@ ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Accumulated huss.
 ALLOCATE (axy_ps      (lon_c,lat_c,NYR)) ! Accumulated ps.
 ALLOCATE (axy_pr      (lon_c,lat_c,NYR)) ! Accumulated pr.
 ALLOCATE (axy_rhs     (lon_c,lat_c,NYR)) ! Accumulated rhs.
-ALLOCATE (axy_wz      (long_c,lat_c,NYR))! Mean yearly water table depth.
+ALLOCATE (axy_wz      (lon_c,lat_c,NYR))! Mean yearly water table depth.
 !----------------------------------------------------------------------!
 ! Accumulated theta.
 !----------------------------------------------------------------------!
@@ -1143,7 +1143,7 @@ DO iDEC = iDEC_start, iDEC_end
             DO I = nlayers, 1, -1
                IF(wv(I) < 1) THEN
                 hmat(I) = h(I,x,y) - zc(I)
-                zw(x,y,iT) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
+                zw(I) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
                  
                END IF
             
@@ -1233,7 +1233,7 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
           axy_rnf  (x,y,iY) = rnf_sum  / FLOAT (nt * NISURF) ! mm s-1
           axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF) ! mm s-1
-          !axy_zw  (x,y,iY) = wz_sum   / FLOAT (nt * NISURF) ! mm
+          !axy_wz  (x,y,iY) = wz_sum   / FLOAT (nt * NISURF) ! mm
           !------------------------------------------------------------!
           axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt)          ! K 
           axy_huss (x,y,iY) = huss_sum / FLOAT (nt)          ! kg kg-1
