@@ -1142,8 +1142,8 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             DO I = nlayers, 1, -1
                IF(wv(I) < 1) THEN
-                hmat(I) = h(I,x,y) - zc(I)
-                zw(I) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
+                hmat(I) = h(I) - zc(I)
+                zw = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
                  
                END IF
             
@@ -1206,7 +1206,7 @@ DO iDEC = iDEC_start, iDEC_end
             ps_sum   = ps_sum   + ps   (x,y,iT)
             pr_sum   = pr_sum   + pr   (x,y,iT)
             rhs_sum  = rhs_sum  + rhs  (x,y,iT)
-            wz_sum   = wz_zum   + wz   (x,y,iT) 
+            wz_sum   = wz_sum   + wz   
             !----------------------------------------------------------!
             ! Possibly move following to within NS loop.
             !----------------------------------------------------------!
