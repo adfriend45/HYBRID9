@@ -940,7 +940,7 @@ DO iDEC = iDEC_start, iDEC_end
            
             !----------------------------------------------------------!
             ! Calculation of water table depth zw (mm) based on 
-            ! Abramopoulos et al 1988 and as implemented in modelE 
+            ! Abramopoulos et al 1988 and as implemented in modelE. 
             ! Testing for first non-saturated layer from bottom up
             !----------------------------------------------------------!
             DO I = nlayers, 1, -1
@@ -1187,6 +1187,7 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             rnf_sum  = rnf_sum  + rnf
             evap_sum = evap_sum + evap
+            !wz_sum = wz_sum + wz
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1207,6 +1208,7 @@ DO iDEC = iDEC_start, iDEC_end
             ps_sum   = ps_sum   + ps   (x,y,iT)
             pr_sum   = pr_sum   + pr   (x,y,iT)
             rhs_sum  = rhs_sum  + rhs  (x,y,iT)
+            wz_sum   = wz_zum   + wz   (x,y,iT) 
             !----------------------------------------------------------!
             ! Possibly move following to within NS loop.
             !----------------------------------------------------------!
