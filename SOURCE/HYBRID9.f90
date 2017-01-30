@@ -935,23 +935,7 @@ DO iDEC = iDEC_start, iDEC_end
               h (I) = MAX (-1.0E8, h(I))
             END DO
             !----------------------------------------------------------!
-           
-            !----------------------------------------------------------!
-            ! Calculation of water table depth zw (mm) based on 
-            ! Abramopoulos et al 1988 and as implemented in modelE. 
-            ! Testing for first non-saturated layer from bottom up
-            !----------------------------------------------------------!
-            DO I = nlayers, 1, -1
-               IF(wv(I) < 1) THEN
-                hmat(I) = h(I) - zc(I)
-                zw(I) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
-                 
-               END IF
-            
-            END DO
-            !----------------------------------------------------------!
-
-
+ 
             !----------------------------------------------------------!
             ! Soil moisture constraint on evaporative flux (0-1).
             !----------------------------------------------------------!
@@ -1150,6 +1134,22 @@ DO iDEC = iDEC_start, iDEC_end
               END IF
             END DO
             !----------------------------------------------------------!
+          
+            !----------------------------------------------------------!
+            ! Calculation of water table depth zw (mm) based on 
+            ! Abramopoulos et al 1988 and as implemented in modelE. 
+            ! Testing for first non-saturated layer from bottom up
+            !----------------------------------------------------------!
+            DO I = nlayers, 1, -1
+               IF(wv(I) < 1) THEN
+                hmat(I) = h(I,x,y) - zc(I)
+                zw(x,y,iT) = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
+                 
+               END IF
+            
+            END DO
+            !----------------------------------------------------------!
+
 
             !----------------------------------------------------------!
             ! New total water for diagnostics (mm).
