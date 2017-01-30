@@ -39,6 +39,7 @@ INTEGER :: theta_varid
 INTEGER :: thetaz_varid
 INTEGER :: dimids_two   (2) ! Array of two dimids.
 INTEGER :: dimids_three (3) ! Array of three dimids.
+INTEGER :: wz_varid
 REAL :: fillval
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: LON_NAME    = "longitude"
@@ -53,6 +54,7 @@ CHARACTER (LEN = *), PARAMETER :: PR_NAME     = "precipitation"
 CHARACTER (LEN = *), PARAMETER :: RHS_NAME    = "relative_humidity"
 CHARACTER (LEN = *), PARAMETER :: THETA_NAME  = "soil_water"
 CHARACTER (LEN = *), PARAMETER :: THETAS_NAME = "soil_water_layers"
+CHARACTER (LEN = *), PARAMETER :: WZ_NAME     = "water_table_depth"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: LON_UNITS        = "degrees_east"
 CHARACTER (LEN = *), PARAMETER :: LAT_UNITS        = "degrees_north"
@@ -146,7 +148,9 @@ CALL CHECK (nf90_def_var(ncid, RHS_NAME  , NF90_float, &
 CALL CHECK (nf90_def_var(ncid, THETA_NAME, NF90_float, &
   dimids_two, theta_varid))
 CALL CHECK (nf90_def_var(ncid, THETAS_NAME, NF90_float, &
-  dimids_three, thetaz_varid))
+  dimids_three, ))
+CALL CHECK (nf90_def_var(ncid, WZ_NAME, NF90_float, &
+ dimits_two, wz_varid))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -162,6 +166,7 @@ CALL CHECK (NF90_PUT_ATT(ncid, rhs_varid, UNITS, RHS_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, theta_varid, &
                          UNITS,THETA_TOTAL_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, thetaz_varid,UNITS, THETA_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, wz_varid, UNITS,DEPTH_UNITS))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -177,6 +182,7 @@ CALL CHECK (nf90_PUT_ATT(ncid, pr_varid    , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, rhs_varid   , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, theta_varid , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, thetaz_varid, "_FillValue", fillval))
+CALL CHECK (nf90_PUT_ATT(ncid, wz_varid    , "_FillValue", fillval))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -233,6 +239,8 @@ CALL CHECK(nf90_put_var(ncid, theta_varid, axy_theta_total(:,:,iyr), &
   start = start_two, count = count_two))
 CALL CHECK(nf90_put_var(ncid, thetaz_varid, axy_theta (:,:,:,iyr), &
   start = start_three, count = count_three))
+CALL CHECK(nf90_put_var(ncid, wz_varid   , axy_wz   (:,:,iyr), &
+  start = start_two, count = count_two)) 
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
