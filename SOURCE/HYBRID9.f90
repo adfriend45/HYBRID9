@@ -149,6 +149,7 @@ REAL :: huss_sum        ! Sum of daily huss over 1 yr         (kg kg-1).
 REAL :: ps_sum          ! Sum of daily ps over 1 yr                (Pa).
 REAL :: pr_sum          ! Sum of daily pr over 1 yr        (kg m-2 s-1).
 REAL :: rhs_sum         ! Sum of daily rhs over 1 yr             (%age).
+REAL :: wz_sum          ! Sum of daily wz over 1 yr                (mm).
 !----------------------------------------------------------------------!
 REAL :: theta_sum_total ! Sum of daily total soil water over 1 yr  (mm).
 !----------------------------------------------------------------------!
@@ -160,6 +161,7 @@ REAL, ALLOCATABLE :: theta_sum (:)
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: hmat (:)
 !----------------------------------------------------------------------!
+
 
 !----------------------------------------------------------------------!
 ! Miscellaneous variables.
