@@ -507,9 +507,7 @@ ALLOCATE (theta_s (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
-! Chunk of water table depth (mm).
-!----------------------------------------------------------------------!
-ALLOCATE (
+
 
 !----------------------------------------------------------------------!
 ! Initialise global diagnostic arrays with fill (i.e. NaN) values.
