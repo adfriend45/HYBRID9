@@ -1249,10 +1249,10 @@ DO iDEC = iDEC_start, iDEC_end
           END DO
           axy_theta_total (x,y,iY) = theta_sum_total / FLOAT (nt)
           !------------------------------------------------------------!
-        END DO
+        END DO ! Loop over years in decade
       END IF ! Soiled grid-box?
-    END DO
-  END DO
+    END DO ! lon_c loop
+  END DO ! lat_c loop
   !--------------------------------------------------------------------!
 
   !--------------------------------------------------------------------!
