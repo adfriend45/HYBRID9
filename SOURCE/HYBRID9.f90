@@ -1150,7 +1150,9 @@ DO iDEC = iDEC_start, iDEC_end
                  WRITE (*,*) 'hmat ,NS ', hmat, NS
                  WRITE (*,*) 'layer ', I
                 wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
-                 
+                 WRITE (*,*)  'wz ', wz
+                 !ELSE
+                 !WRITE (*,*) 'water table below soil layer depth'  
                END IF
             
             END DO
