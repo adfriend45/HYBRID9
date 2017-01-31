@@ -1149,6 +1149,11 @@ DO iDEC = iDEC_start, iDEC_end
                  WRITE (*,*) 'lon, lat ',lon(x),lat(y)
                  WRITE (*,*) 'hmat ,NS ', hmat, NS
                  WRITE (*,*) 'layer ', I
+                 !IF (xk(I) <= tol) THEN
+                   !denom = -2.D0 * hmat / dz(I)
+                   !ELSE denom= MAX( f(I-1) / xk(I) + 1.D0, -2.D0 * hmat / dz(I) )
+                 !END IF
+                !wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / denom + tol)
                 wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
                  WRITE (*,*)  'wz ', wz
                  !ELSE
