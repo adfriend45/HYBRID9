@@ -157,10 +157,6 @@ REAL :: theta_sum_total ! Sum of daily total soil water over 1 yr  (mm).
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: theta_sum (:)
 !----------------------------------------------------------------------!
-! soil matric potential for calculating water table                (mm).
-!----------------------------------------------------------------------!
-REAL, ALLOCATABLE :: hmat (:)
-!----------------------------------------------------------------------!
 
 
 !----------------------------------------------------------------------!
@@ -222,6 +218,11 @@ REAL :: w0,w1
 !----------------------------------------------------------------------!
 REAL :: zw  
 !----------------------------------------------------------------------!
+! soil matric potential for calculating water table                (mm).
+!----------------------------------------------------------------------!
+REAL :: hmat 
+!----------------------------------------------------------------------!
+
 
 
 !----------------------------------------------------------------------!
@@ -1142,8 +1143,9 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             DO I = nlayers, 1, -1
                IF(wv(I) < 1) THEN
-                hmat(I) = h(I) - zc(I)
-                zw = zb(I) - sqrt( (-2.E0 * dz(I)) / (f(I-1) / xk(I)) )
+                hmat = h(I) - zc(I)
+                 
+                zw = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
                  
                END IF
             
@@ -1240,7 +1242,7 @@ DO iDEC = iDEC_start, iDEC_end
           axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)          ! Pa
           axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)          ! kg m-2 s-1
           axy_rhs  (x,y,iY) = rhs_sum  / FLOAT (nt)          ! no units
-          axy_wz   (x,y,iY) = wz_sum   /  FLOAT (nt)         ! mm
+          axy_wz   (x,y,iY) = wz_sum   / FLOAT (nt)          ! mm
           !------------------------------------------------------------!
           DO I = 1, nlayers
             axy_theta (I,x,y,iY) = theta_sum (I) / FLOAT (nt)
