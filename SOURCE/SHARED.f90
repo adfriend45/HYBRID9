@@ -169,6 +169,7 @@ REAL, ALLOCATABLE :: axy_pr          (:,:,:)
 REAL, ALLOCATABLE :: axy_rhs         (:,:,:)
 REAL, ALLOCATABLE :: axy_theta       (:,:,:,:)
 REAL, ALLOCATABLE :: axy_theta_total (:,:,:)
+REAL, ALLOCATABLE :: axy_wz          (:,:,:) 
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
