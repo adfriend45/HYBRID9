@@ -216,7 +216,7 @@ REAL :: w0,w1
 !----------------------------------------------------------------------!
 ! Water table depth	                                           (mm).
 !----------------------------------------------------------------------!
-REAL :: zw  
+REAL :: wz  
 !----------------------------------------------------------------------!
 ! soil matric potential for calculating water table                (mm).
 !----------------------------------------------------------------------!
@@ -1137,15 +1137,19 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
           
             !----------------------------------------------------------!
-            ! Calculation of water table depth zw (mm) based on 
+            ! Calculation of water table depth wz (mm) based on 
             ! Abramopoulos et al 1988 and as implemented in modelE. 
             ! Testing for first non-saturated layer from bottom up
             !----------------------------------------------------------!
             DO I = nlayers, 1, -1
-               IF(wv(I) < 1) THEN
+               IF((wv(I) < 1) .AND. (wv(I-1)==1)) THEN
                 hmat = h(I) - zc(I)
-                 
-                zw = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
+                 WRITE (*,*) 'wv(I) ', wv(I)
+                 WRITE (*,*) 'wv(I-1) ',wv(I-1)
+                 WRITE (*,*) 'lon, lat ',lon(x),lat(y)
+                 WRITE (*,*) 'hmat ,NS ', hmat, NS
+                 WRITE (*,*) 'layer ', I
+                wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
                  
                END IF
             
@@ -1263,7 +1267,6 @@ DO iDEC = iDEC_start, iDEC_end
   DEALLOCATE (ps)
   DEALLOCATE (pr)
   DEALLOCATE (rhs)
-  DEALLOCATE (wz)
   !--------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
