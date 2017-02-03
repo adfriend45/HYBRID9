@@ -36,7 +36,7 @@ INTEGER :: ps_varid
 INTEGER :: pr_varid
 INTEGER :: rhs_varid
 INTEGER :: theta_varid
-INTEGER :: thetaz_varid
+INTEGER :: thetas_varid
 INTEGER :: dimids_two   (2) ! Array of two dimids.
 INTEGER :: dimids_three (3) ! Array of three dimids.
 INTEGER :: wz_varid
@@ -166,7 +166,7 @@ CALL CHECK (NF90_PUT_ATT(ncid, rhs_varid, UNITS, RHS_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, theta_varid, &
                          UNITS,THETA_TOTAL_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, thetas_varid,UNITS, THETA_UNITS))
-CALL CHECK (NF90_PUT_ATT(ncid, wz_varid, UNITS,DEPTH_UNITS))
+CALL CHECK (NF90_PUT_ATT(ncid, wz_varid, UNITS,  DEPTH_UNITS))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -181,7 +181,7 @@ CALL CHECK (nf90_PUT_ATT(ncid, ps_varid    , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, pr_varid    , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, rhs_varid   , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, theta_varid , "_FillValue", fillval))
-CALL CHECK (nf90_PUT_ATT(ncid, thetaz_varid, "_FillValue", fillval))
+CALL CHECK (nf90_PUT_ATT(ncid, thetas_varid, "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, wz_varid    , "_FillValue", fillval))
 !----------------------------------------------------------------------!
 
@@ -237,7 +237,7 @@ CALL CHECK(nf90_put_var(ncid, rhs_varid  , axy_rhs  (:,:,iyr), &
   start = start_two, count = count_two))
 CALL CHECK(nf90_put_var(ncid, theta_varid, axy_theta_total(:,:,iyr), &
   start = start_two, count = count_two))
-CALL CHECK(nf90_put_var(ncid, thetaz_varid, axy_theta (:,:,:,iyr), &
+CALL CHECK(nf90_put_var(ncid, thetas_varid, axy_theta (:,:,:,iyr), &
   start = start_three, count = count_three))
 CALL CHECK(nf90_put_var(ncid, wz_varid   , axy_wz   (:,:,iyr), &
   start = start_two, count = count_two)) 

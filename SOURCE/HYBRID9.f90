@@ -1144,18 +1144,18 @@ DO iDEC = iDEC_start, iDEC_end
             DO I = nlayers, 1, -1
                IF((wv(I) < 1) .AND. (wv(I-1)==1)) THEN
                 hmat = h(I) - zc(I)
-                 WRITE (*,*) 'wv(I) ', wv(I)
-                 WRITE (*,*) 'wv(I-1) ',wv(I-1)
-                 WRITE (*,*) 'lon, lat ',lon(x),lat(y)
-                 WRITE (*,*) 'hmat ,NS ', hmat, NS
-                 WRITE (*,*) 'layer ', I
+                 !WRITE (*,*) 'wv(I) ', wv(I)
+                 ! WRITE (*,*) 'wv(I-1) ',wv(I-1)
+                 !WRITE (*,*) 'lon, lat ',lon(x),lat(y)
+                 !WRITE (*,*) 'hmat ,NS ', hmat, NS
+                 !WRITE (*,*) 'layer ', I
                  !IF (xk(I) <= tol) THEN
                    !denom = -2.D0 * hmat / dz(I)
                    !ELSE denom= MAX( f(I-1) / xk(I) + 1.D0, -2.D0 * hmat / dz(I) )
                  !END IF
                 !wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / denom + tol)
                 wz = zb(I) - sqrt( (-2.E0 * hmat * dz(I)) / (f(I-1) / xk(I)) )
-                 WRITE (*,*)  'wz ', wz
+                 !WRITE (*,*)  'wz ', wz
                  !ELSE
                  !WRITE (*,*) 'water table below soil layer depth'  
                END IF
