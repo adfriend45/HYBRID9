@@ -1,0 +1,17 @@
+# ignore the following files for commit 
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+*.app
+
