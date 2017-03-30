@@ -163,7 +163,7 @@ REAL, ALLOCATABLE :: theta_sum (:)
 ! Miscellaneous variables.
 !----------------------------------------------------------------------!
 REAL :: thetan ! New theta for testing over/undersaturation  (mm3 mm-3).
-REAL :: dtheta ! Derivative of theta                     (mm3 mm-3 s-1).
+REAL :: dtheta ! Time derivative of theta                (mm3 mm-3 s-1).
 REAL :: evap   ! Evaporative flux                              (mm s-1).
 REAL :: dt     ! Integration timestep                               (s).
 REAL :: dflux  ! Negative runoff removal                       (mm s-1).
@@ -418,7 +418,7 @@ IF (my_id /= num_procs-1) CALL MPI_Send (file_free, 1, MPI_INT, &
 !----------------------------------------------------------------------!
 ! Compute soil layer thicknesses and centres (mm).
 ! Centres are negative  values below surface.
-! Layers start with 1 at surface.
+! Layer indices start with 1 at surface.
 !----------------------------------------------------------------------!
 DO I = 1, nsoil_layers_max
   dz (I) = zb (I) - zb (I+1)
@@ -1119,19 +1119,32 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             ! Underground runoff from each layer               (mm s-1).
             ! Hack for now.
+            ! Drainage based on Eqn. 7.168 of Oleson et al. (2013).
+            ! (mm s-1).
             !----------------------------------------------------------!
-            slope = 0.00
-            DO I = 1, nlayers
-              rnff (I) = xk (I) * slope * dz (I) * &
-                         theta (I,x,y) / theta_s (I,x,y)
-            END DO
+            slope = 0.035 ! Radians of slope (e.g. 2 degrees = 0.035).
+            !fdrai = 2.5E-3 ! Decay factor (mm-1).
+            ! Need to diagnose WTD.
+            !WTD = 4000.0 ! Water table depth (mm).
+            ! Maximum drainage when the water table depth is at the
+            ! surface (mm s-1).
+            !qdrai_max = 10.0 * SIN (slope)
+            ! Drainage (mm s-1).
+            !qdrai = qdrai_max * EXP (-fdrai * WTD)
+            rnff (:) = 0.0
+            !rnff (nlayers) = drai
+            !DO I = 1, nlayers
+            !  rnff (I) = xk (I) * slope * dz (I) * &
+            !             theta (I,x,y) / theta_s (I,x,y)
+            !END DO
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
             ! Water fluxes at each layer interface (mm s-1).
             ! Uses Darcy's Law as in Eqn. 7.116 of Oleson et al. (2013).
             ! Also, to make it positive upwards, denominator is reversed
-            ! as z is positive downwards in CLM.
+            ! as z is positive downwards in CLM but negative downwards
+            ! in HYBRID9.
             ! f (I) is the interface at the bottom of layer I, so
             ! f (1) is at the bottom of the first layer.
             !----------------------------------------------------------!
