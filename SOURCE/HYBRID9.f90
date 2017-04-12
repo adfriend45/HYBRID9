@@ -6,7 +6,7 @@ PROGRAM H9
 ! Global simulation of land surface water and carbon fluxes.
 ! Uses PGF forcings, 1901-2012.
 ! Andrew D. Friend
-! 5th April, 2017
+! 12th April, 2017
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -172,9 +172,11 @@ REAL :: drnf   ! Correction to runoff                           (mm s-1)
 REAL :: slope  ! Slope                                           (ratio)
 REAL :: num    ! 
 REAL :: den    ! 
-REAL :: dpsie  ! 
+REAL :: dzq    ! 
 REAL :: zwt    ! Water table depth, positive downwards              (mm)
 REAL :: BET    ! 
+REAL :: tempi  ! Temporary variable for calculating vol_eq
+REAL :: temp0  ! Temporary variable for calculating vol_eq
 !----------------------------------------------------------------------!
 ! Water available for evaporation over timestep                (mm s-1).
 !----------------------------------------------------------------------!
@@ -232,10 +234,6 @@ REAL :: s1
 !----------------------------------------------------------------------!
 REAL :: s2
 !----------------------------------------------------------------------!
-! Soil size distribution at layer interface                   (unitless)
-!----------------------------------------------------------------------!
-REAL :: lambda_int
-!----------------------------------------------------------------------!
 ! Soil wetness (-).
 !----------------------------------------------------------------------!
 REAL :: s_node
@@ -272,9 +270,9 @@ REAL, DIMENSION (:), ALLOCATABLE :: qin
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: qout
 !----------------------------------------------------------------------!
-! Soil layer boundaries with reference to surface                  (mm).
+! Soil layer interface depths with reference to surface             (mm)
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:), ALLOCATABLE :: zb
+REAL, DIMENSION (:), ALLOCATABLE :: zi
 !----------------------------------------------------------------------!
 ! Soil layer thicknesses                                           (mm).
 !----------------------------------------------------------------------!
@@ -332,9 +330,13 @@ REAL, DIMENSION (:), ALLOCATABLE :: dwat,dwat2
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: GAM
 !----------------------------------------------------------------------!
-! Volumetric soil water (mm^3/mm^3).
+! Volumetric soil water content (mm^3/mm^3).
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: theta
+!----------------------------------------------------------------------!
+! Equilibrium volumetric soil water content (mm^3/mm^3).
+!----------------------------------------------------------------------!
+REAL, DIMENSION (:), ALLOCATABLE :: vol_eq
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -441,7 +443,7 @@ ALLOCATE (dwat2  (nsoil_layers_max+1))
 ALLOCATE (dwat   (nsoil_layers_max))
 ALLOCATE (GAM    (nsoil_layers_max+1))
 !----------------------------------------------------------------------!
-ALLOCATE (zb     (0:Nlevgrnd))         ! Layer boundaries           (mm)
+ALLOCATE (zi     (0:Nlevgrnd))         ! Layer interface depths     (mm)
 ALLOCATE (dz     (1:Nlevgrnd))         ! Layer thicknesses          (mm)
 ALLOCATE (zsoi   (1:Nlevgrnd))         ! Soil layer nodes           (mm)
 ALLOCATE (zc_o   (1:nsoil_layers_max)) ! Soil layer nodes           (mm)
@@ -449,9 +451,15 @@ ALLOCATE (zc     (1:Nlevgrnd))         ! Ground layer nodes         (mm)
 ALLOCATE (smp    (nsoil_layers_max))   ! Matric potentials          (mm)
 ALLOCATE (zq     (nsoil_layers_max+1)) ! Eqm. water potentials      (mm)
 !----------------------------------------------------------------------!
-! Volumetric soil water (mm^3 mm^-3).
+! Volumetric soil water content (mm^3/mm^3).
 !----------------------------------------------------------------------!
 ALLOCATE (theta (nsoil_layers_max))
+!----------------------------------------------------------------------!
+! Equilibrium volumetric soil water (mm^3/mm^3).
+!----------------------------------------------------------------------!
+ALLOCATE (vol_eq (nsoil_layers_max+1))
+!----------------------------------------------------------------------!
+
 !----------------------------------------------------------------------!
 ALLOCATE (theta_sum(nsoil_layers_max)) ! For diagnostics   (mm^3 mm^-3).
 !----------------------------------------------------------------------!
@@ -502,7 +510,7 @@ IF (file_free == 1) THEN
   ! which is boundary 1 at 0 mm (mm).
   !--------------------------------------------------------------------!
   DO I = 0, Nlevgrnd
-    READ (10,*) zb (I)
+    READ (10,*) zi (I)
   END DO
   !--------------------------------------------------------------------!
   CLOSE (10)
@@ -548,14 +556,14 @@ IF (my_id /= num_procs-1) CALL MPI_Send (file_free, 1, MPI_INT, &
 
 !----------------------------------------------------------------------!
 ! Compute soil layer thicknesses and centres (mm).
-! Nodes are positive  values below surface.
+! Nodes are positive values below surface.
 ! Layer indices start with 1 at surface.
 !----------------------------------------------------------------------!
 DO I = 1, Nlevgrnd
-  dz (I) = zb (I) - zb (I-1)
+  dz (I) = zi (I) - zi (I-1)
 END DO
 DO I = 1, Nlevgrnd
-  zc (I) = zb (I) - dz (I) / 2.0
+  zc (I) = zi (I) - dz (I) / 2.0
 END DO
 !----------------------------------------------------------------------!
 ! Set soil layer node depths for diagnostics (mm).
@@ -902,9 +910,9 @@ END DO ! I = 1, nsoil_layers_max ! Loop over soil layers.
 !----------------------------------------------------------------------!
 ! Write out saturated water potentials for diagnostics (mm).
 !----------------------------------------------------------------------!
-file_name = 'psi_s.nc'
-WRITE (*,*) 'Writing to ',TRIM(file_name)
-CALL WRITE_NET_CDF_3DR_soils
+!file_name = 'psi_s.nc'
+!WRITE (*,*) 'Writing to ',TRIM(file_name)
+!CALL WRITE_NET_CDF_3DR_soils
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -1136,7 +1144,7 @@ DO iDEC = iDEC_start, iDEC_end
             DO NS = 1, NISURF
 
             !----------------------------------------------------------!
-            ! Initial total soil water for diagnostics (mm).
+            ! Initial total soil water for INTERACTIVE diagnostics (mm).
             ! Also compute volumetric water (mm^3/mm^3).
             !----------------------------------------------------------!
             w0 = prec * dt
@@ -1154,7 +1162,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Holder for now.
             ! Water table depth (mm).
             !----------------------------------------------------------!
-            zwt = 5000.0
+            zwt = 4000.0
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1166,7 +1174,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Allow jwt to equal zero when zwt is in top layer.
             !----------------------------------------------------------!
             DO I = 1, nlayers
-              IF (zwt <= zc (I)) THEN
+              IF (zwt <= zi (I)) THEN
                 jwt = I - 1
                 EXIT
               END IF
@@ -1174,59 +1182,52 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            ! Equilibrium matric potentials of each layer (mm).
-            ! Assumed relationshop from Eqn. 7.86 of
-            ! Oleson et al. (2013), with fixed water table depth of 4 m.
-            ! Requires psi_s at WTD, assume is same as bottom layer for
-            ! now. The WTD depth cancels out for the flux equation, but
-            ! is really needed here for the value of psi_s, but just
-            ! assume is always in bottom layer for now.
+            ! Calculate the equilibrium water content based on the water
+            ! table depth.
+            ! assumes sucsat == -psi_s
             !----------------------------------------------------------!
             DO I = 1, nlayers
-              zq (I) = psi_s (nlayers,x,y) + zwt - zc (I)
+              !--------------------------------------------------------!
+              tempi = (((-psi_s (I,x,y) + zwt - zi (I)) &
+                      / (-psi_s (I,x,y)))) ** &
+                     (1.0 - 1.0 / bsw (I,x,y))
+              temp0 = (((-psi_s (I,x,y) + zwt - zi (I-1)) &
+                      / (-psi_s (I,x,y)))) ** &
+                     (1.0 - 1.0 / bsw (I,x,y))
+              vol_eq (I) = psi_s (I,x,y) * theta_s (I,x,y) &
+                           / (1.0 - 1.0 / bsw (I,x,y)) &
+                           / (zi (I) - zi (I-1)) * (tempi - temp0)
+              vol_eq (I) = MAX (vol_eq (I), 0.0)
+              vol_eq (I) = MIN (theta_s (I,x,y), vol_eq (I))
+              !--------------------------------------------------------!
+              zq (I) = psi_s (I,x,y) * &
+                       (MAX (vol_eq (I) / theta_s (I,x,y), 0.01)) &
+                       ** (-bsw (I,x,y))
+              zq (I) = MAX (smpmin, zq (I))
+              !--------------------------------------------------------!
             END DO
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            ! If water table is below soil column calculate zq for 
-            ! next layer below.
+            ! zq for 9th layer.
             !----------------------------------------------------------!
             I = nlayers
-            !----------------------------------------------------------!
-            IF (jwt == nlayers) THEN
-              zq (I+1) = psi_s (nlayers,x,y) + zwt - zc (I)
-            END IF
-            !----------------------------------------------------------!
-
-            !----------------------------------------------------------!
-            DO I = 1, nlayers
-              !--------------------------------------------------------!
-              ! Water saturation fraction of layers (0-1).
-              !--------------------------------------------------------!
-              IF (theta_s (I,x,y) > trunc) THEN
-                s_node = theta (I) / theta_s (I,x,y)
-              ELSE
-                s_node = 0.01
-              END IF
-              s_node = MIN (one, s_node)
-              !--------------------------------------------------------!
-              ! Matric potentials and derivatives at each node depth 
-              ! (mm).
-              ! This is Eqn. 7.94 of Oleson et al. (2013).
-              !--------------------------------------------------------!
-              smp (I) = psi_s (I,x,y) * s_node ** (-bsw (I,x,y))
-              smp (I) = MAX (-1.0E8, smp (I))
-              !--------------------------------------------------------!
-              dsmpdw (I) = (-bsw (I,x,y)) * smp (I) / &
-                           (s_node * theta_s (I,x,y))
-              !--------------------------------------------------------!
-            END DO
+            tempi = 1.0
+            temp0 = (((-psi_s (I,x,y) + zwt - zi (I)) / &
+                    (-psi_s (I,x,y)))) ** (1.0 - 1.0 / bsw (I,x,y))
+            vol_eq (I+1) = psi_s (I,x,y) * theta_s (I,x,y) / &
+                           (1.0 - 1.0 / bsw (I,x,y)) &
+                           / (zwt - zi (I)) * (tempi - temp0)
+            vol_eq (I+1) = MAX (vol_eq (I+1), 0.0)
+            vol_eq (I+1) = MIN (theta_s (I,x,y), vol_eq (I+1))
+            zq (I+1) = psi_s (I,x,y) * (MAX (vol_eq (I+1) &
+                       / theta_s (I,x,y), 0.01)) ** (-bsw (I,x,y))
+            zq (I+1) = MAX (smpmin, zq (I+1))
             !----------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Hydraulic conductivities at interfaces between layers
-            ! based on Eqn. 7.89 of Oleson et al. (2013) (mm s-1).
-            ! Refers to bottom of layer.
+            ! Hydraulic conductivity and soil matric potential and their
+            ! derivatives.
+            ! I refers to bottom of layer.
             !----------------------------------------------------------!
             DO I = 1, nlayers
               !--------------------------------------------------------!
@@ -1236,9 +1237,9 @@ DO iDEC = iDEC_start, iDEC_end
               ! "s" at interface of layer.
               !--------------------------------------------------------!
               s1 =  0.5 * (theta   (I) + &
-                           theta   (MIN(nlayers-1,I+1))) / &
+                           theta   (MIN (nlayers,I+1))) / &
                    (0.5 * (theta_s (I,x,y) + &
-                           theta_s (MIN(nlayers-1,I+1),x,y)))
+                           theta_s (MIN (nlayers,I+1),x,y)))
               s1 = MIN (1.0, s1)
               s2 = k_s (I,x,y) * s1 ** (2.0 * bsw (I,x,y) + 2.0)
               !--------------------------------------------------------!
@@ -1251,14 +1252,23 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               dhkdw (I) = (2.0 * bsw (I,x,y) + 3.0) * s2 * &
                           (1.0 / (theta_s (I,x,y) + &
-                                  theta_s (MIN (nlayers-1,I+1),x,y)))
+                                  theta_s (MIN (nlayers,I+1),x,y)))
               !--------------------------------------------------------!
-              k_s_int = 0.5 * (k_s (I,x,y) + k_s (I+1,x,y))
+              ! Compute matric potential and derivative based on liquid
+              ! water only.
               !--------------------------------------------------------!
-              ! Compute soil size distribution index at the
-              ! interface as mean of the two layers (unitless).
+              s_node = MAX (theta (I) / theta_s (I,x,y), 0.01)
+              s_node = MIN (one, s_node)
               !--------------------------------------------------------!
-              lambda_int = 0.5 * (lambda (I,x,y) + lambda (I+1,x,y))
+              ! Matric potentials and derivatives at each node depth 
+              ! (mm).
+              ! This is Eqn. 7.94 of Oleson et al. (2013).
+              !--------------------------------------------------------!
+              smp (I) = psi_s (I,x,y) * s_node ** (-bsw (I,x,y))
+              smp (I) = MAX (smpmin, smp (I))
+              !--------------------------------------------------------!
+              dsmpdw (I) = (-bsw (I,x,y)) * smp (I) / &
+                           (s_node * theta_s (I,x,y))
               !--------------------------------------------------------!
             END DO
 
@@ -1300,7 +1310,6 @@ DO iDEC = iDEC_start, iDEC_end
             ! Evaporative flux (mm s-1).
             !----------------------------------------------------------!
             huss (x,y,iT) = qb * rhs (x,y,iT) / 100.0
-            !evap = beta * rho3 * cna * (qb - huss (x,y,iT))
             qflx_evap_soi = beta * rho3 * cna * &
                             (qb - qb * rhs (x,y,iT) / 100.0)
             qflx_evap_soi = MAX (zero, qflx_evap_soi)
@@ -1345,27 +1354,20 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            ! Water fluxes at each layer interface (mm s-1).
-            ! Uses Darcy's Law as in Eqn. 7.116 of Oleson et al. (2013).
-            ! Also, to make it positive upwards, denominator is reversed
-            ! as z is positive downwards in CLM but negative downwards
-            ! in HYBRID9.
-            ! f (I) is the interface at the bottom of layer I, so
-            ! f (1) is at the bottom of the first layer.
+            ! Bottom boundary flux (mm s-1).
             !----------------------------------------------------------!
-            !DO I = 1, nlayers - 1
-              !--------------------------------------------------------!
-            !  f (I) = -xk (I) * ((smp (I) - smp (I+1)) + &
-            !          (zq (I+1) - zq (I))) / &
-            !          (zc (I) - zc (I+1))
-              !--------------------------------------------------------!
-            !END DO
+            !f (nlayers) = gzero
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            ! Bottom boundary flux (mm s-1).
+            ! Aquifer (9th) layer ('zmm' == zc).
             !----------------------------------------------------------!
-            !f (nlayers) = zero
+            zc (nlayers+1) = 0.5 * (zwt + zc (nlayers))
+            IF (jwt < nlayers) THEN
+              dz (nlayers+1) = dz (nlayers)
+            ELSE
+              dz (nlayers+1) = zwt - zc (nlayers)
+            ENDIF
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1378,42 +1380,42 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             I = 1
             qin (I) = q_infl
-            den   = (zc  (I+1) - zc  (I))
-            dpsie = (zq  (I+1) - zq  (I))
-            num   = (smp (I+1) - smp (I)) - dpsie
-            qout (I) = -xk (I) * num / den
+            den = (zc  (I+1) - zc  (I))
+            dzq = (zq  (I+1) - zq  (I))
+            num = (smp (I+1) - smp (I)) - dzq
+            qout (I) = -xk (I) * num / den     ! -7.116
             dqodw1 (I) = -(-xk (I) * dsmpdw (I)   + num * dhkdw (I)) / &
-                         den
-            dqodw2 (I) = -(-xk (I) * dsmpdw (I+1) + num * dhkdw (I)) / &
-                         den
+                         den                   ! -7.119
+            dqodw2 (I) = -( xk (I) * dsmpdw (I+1) + num * dhkdw (I)) / &
+                         den                   ! -7.120
             rmx (I) = qin (I) - qout (I)
-            amx (I) = 0.0
-            bmx (I) = dz (I) / dt + dqodw1 (I)
-            cmx (I) = dqodw2 (I)
+            amx (I) = 0.0                      !  7.136
+            bmx (I) = dz (I) / dt + dqodw1 (I) ! -7.137
+            cmx (I) = dqodw2 (I)               ! -7.138
             !----------------------------------------------------------!
             ! Nodes I = 2, to I = nlayers-1.
             !----------------------------------------------------------!
             DO I = 2, nlayers - 1
               !--------------------------------------------------------!
-              den   = zc  (I) - zc  (I-1)
-              dpsie = zq  (I) - zq  (I-1)
-              num   = smp (I) - smp (I-1) - dpsie
+              den = zc  (I) - zc  (I-1)
+              dzq = zq  (I) - zq  (I-1)
+              num = smp (I) - smp (I-1) - dzq
               qin (I) = -xk (I-1) * num / den
               dqidw0 (I) = -(-xk (I-1) * dsmpdw (I-1) + &
-                           num * dhkdw (I-1)) / den
+                           num * dhkdw (I-1)) / den           ! -7.117
               dqidw1 (I) = -( xk (I-1) * dsmpdw (I)   + &
-                           num * dhkdw (I-1)) / den
-              den    = zc (I+1) - zc (I)
-              dpsie  = zq (I+1) - zq (I)
-              num   = (smp (I+1) - smp (I)) - dpsie
+                           num * dhkdw (I-1)) / den           ! 
+              den = zc (I+1) - zc (I)
+              dzq = zq (I+1) - zq (I)
+              num = (smp (I+1) - smp (I)) - dzq
               qout (I) = -xk (I) * num / den
               dqodw1 (I) = -(-xk (I) * dsmpdw (I)   + &
-                           num * dhkdw (I)) / den
-              dqodw2 (I) = -(-xk (I) * dsmpdw (I+1) + &
+                           num * dhkdw (I)) / den             ! 
+              dqodw2 (I) = -( xk (I) * dsmpdw (I+1) + &
                            num * dhkdw (I)) / den
               rmx (I) = qin (I) - qout (I)
-              amx (I) = -dqidw0 (I)
-              bmx (I) = dz (I) / dt - dqidw1 (I) + dqodw1 (I)
+              amx (I) = -dqidw0 (I)                           ! -7.140
+              bmx (I) = dz (I) / dt - dqidw1 (I) + dqodw1 (I) ! -7.141
               cmx (I) = dqodw2 (I)
               !--------------------------------------------------------!
             END DO ! I = 2, nlayers - 1
@@ -1427,13 +1429,13 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             IF (I > jwt) THEN ! Water table is in soil column.
               !--------------------------------------------------------!
-              den   = zc  (I) - zc  (I-1)
-              dpsie = zq  (I) - zq  (I-1)
-              num   = smp (I) - smp (I-1) - dpsie
+              den = zc  (I) - zc  (I-1)
+              dzq = zq  (I) - zq  (I-1)
+              num   = smp (I) - smp (I-1) - dzq
               qin (I) = -xk (I-1) * num / den
               dqidw0 (I) = -(-xk (I-1) * dsmpdw (I-1) + &
                            num * dhkdw (I-1)) / den
-              dqidw1 (I) = -(-xk (I-1) * dsmpdw (I) + &
+              dqidw1 (I) = -( xk (I-1) * dsmpdw (I) + &
                            num * dhkdw (I-1)) / den
               qout   (I) = 0.0
               dqodw1 (I) = 0.0
@@ -1461,7 +1463,7 @@ DO iDEC = iDEC_start, iDEC_end
               ! Compute smp for aquifer layer (mm).
               !--------------------------------------------------------!
               smp1 = psi_s (I,x,y) * s_node ** (-bsw (I,x,y))
-              smp1 = MAX (-1.0E8, smp1)
+              smp1 = MAX (smpmin, smp1)
               !--------------------------------------------------------!
               ! Compute dsmpdw for aquifer layer.
               !--------------------------------------------------------!
@@ -1470,20 +1472,20 @@ DO iDEC = iDEC_start, iDEC_end
               ! First set up bottom layer of soil column.
               !--------------------------------------------------------!
               den   = zc  (I) - zc  (I-1)
-              dpsie = zq  (I) - zq  (I-1)
-              num   = smp (I) - smp (I-1) - dpsie
+              dzq = zq  (I) - zq  (I-1)
+              num   = smp (I) - smp (I-1) - dzq
               qin (I) = -xk (I) * num / den
-              dqidw0 = -(-xk(I-1) * dsmpdw (I-1) + num * dhkdw (I-1)) &
-                       / den
-              dqidw1 = -(-xk(I-1) * dsmpdw (I)   + num * dhkdw (I-1)) &
-                       / den
-              den   = zc (I+1) - zc (I)
-              dpsie = zq (I+1) - zq (I)
-              num = smp1 - smp (I) - dpsie
+              dqidw0 (I) = -(-xk(I-1) * dsmpdw (I-1) + &
+                           num * dhkdw (I-1)) / den
+              dqidw1 (I) = -( xk(I-1) * dsmpdw (I)   + &
+                           num * dhkdw (I-1)) / den
+              den = zc (I+1) - zc (I)
+              dzq = zq (I+1) - zq (I)
+              num = smp1 - smp (I) - dzq
               qout (I) = -xk (I) * num / den
               dqodw1 (I) = -(-xk (I) * dsmpdw (I) + num * dhkdw (I)) &
                            / den
-              dqodw2 (I) = -(-xk (I) * dsmpdw1 + num * dhkdw (I)) &
+              dqodw2 (I) = -( xk (I) * dsmpdw1 + num * dhkdw (I)) &
                            / den
               !--------------------------------------------------------!
 
@@ -1500,7 +1502,7 @@ DO iDEC = iDEC_start, iDEC_end
               qin (I+1) = qout (I)
               dqidw0 (I+1) = -(-xk (I) * dsmpdw (I) + num * dhkdw (I)) &
                              / den
-              dqidw1 (I+1) = -(-xk (I) * dsmpdw1    + num * dhkdw (I)) &
+              dqidw1 (I+1) = -( xk (I) * dsmpdw1    + num * dhkdw (I)) &
                              / den
               qout   (I+1) = 0.0 ! Zero-flow bottom boundary condition.
               dqodw1 (I+1) = 0.0 ! Zero-flow bottom boundary condition.
@@ -1541,11 +1543,25 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             ! Renew the mass of liquid water also compute qcharge from
             ! dwat in aquifer layer and update in drainage for case
-            ! iwt < nlayers.
+            ! jwt < nlayers.
             DO I = 1, nlayers
+              !--------------------------------------------------------!
               h2osoi_liq (I,x,y) = h2osoi_liq (I,x,y) + &
                                    dwat2 (I) * dz (I)
+              !--------------------------------------------------------!
             END DO
+            !----------------------------------------------------------!
+
+            !----------------------------------------------------------!
+            ! Drainage (to work up).
+            !----------------------------------------------------------!
+            !IF (jwt == nlayers) THEN
+              ! Water table is below the soil column.
+            !  h2osoi_liq (nlayers) = h2osoi_liq (nlayers) + &
+            !  MAX ()
+            !ELSE
+              ! Water table within soil layers 1-8.
+            !END IF
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1569,24 +1585,35 @@ DO iDEC = iDEC_start, iDEC_end
             END DO
             !----------------------------------------------------------!
 
+            IF (INTERACTIVE) THEN
+            !----------------------------------------------------------!
+            ! Update new total soil water with change in aquifer water
+            ! (mm).
+            !----------------------------------------------------------!
+            w1 = w1 + dwat2 (nlayers+1) * dz (nlayers+1)
             !----------------------------------------------------------!
             ! Check for conservation of water.
             !----------------------------------------------------------!
-            !IF (ABS (w1 - w0) > 0.001) THEN
-            !  WRITE (*,*)
-            !  WRITE (*,*) 'Water imbalance > 0.001 mm ',w1-w0
-            !  WRITE (*,*) 'my_id x y ',my_id,x,y
-            !  WRITE (*,*) 'lon, lat, iTIME ',lon(x),lat(y),iTIME
-            !  WRITE (*,*) 'theta sum = ',SUM (theta(1:nlayers))
-            !  WRITE (*,*) 'rnff  = ',dt*SUM (rnff(1:nlayers))
-            !  WRITE (*,*) 'rnf qflx_evap_soi = ',dt*rnf,dt*qflx_evap_soi
-            !  WRITE (*,*) 'pr = ',dt*pr(x,y,iTIME)
-            !  WRITE (*,*) 'beta = ',beta
-            !  DO I = 1, nlayers
-            !    WRITE (*,*) I,theta(I),theta_m(I,x,y)
-            !  END DO
-              !STOP
-            !END IF
+            IF (ABS (w1 - w0) > 0.1) THEN
+              WRITE (*,*)
+              WRITE (*,*) 'Water imbalance > 0.1 mm ',w1-w0
+              WRITE (*,*) 'DiTIME = ',iTIME-time_BOY (jyear-1859)+1
+              WRITE (*,*) 'my_id x y ',my_id,x,y
+              WRITE (*,*) 'lon, lat, iTIME ',lon(x),lat(y),iTIME
+              WRITE (*,*) 'theta sum = ',SUM (theta(1:nlayers))
+              WRITE (*,*) 'rnff  = ',dt*SUM (rnff(1:nlayers))
+              WRITE (*,*) 'rnf qflx_evap_soi = ',dt*rnf,dt*qflx_evap_soi
+              WRITE (*,*) 'qout (nlayers) = ',qout(nlayers)*dt
+              WRITE (*,*) 'qcharge = ',dwat2(nlayers+1)*dz(nlayers+1)
+              WRITE (*,*) 'pr = ',dt*pr(x,y,iT)
+              WRITE (*,*) 'beta = ',beta
+              DO I = 1, nlayers
+                WRITE (*,*) I,theta(I),theta_m(I,x,y)
+              END DO
+              STOP
+            END IF
+            !----------------------------------------------------------!
+            END IF ! INTERACTIVE
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
