@@ -130,7 +130,7 @@ count_three = (/nsoil_layers_max,lon_c,lat_c/)
 !----------------------------------------------------------------------!
 CALL CHECK (NF90_PUT_VAR(ncid, lat_varid, lat_all))
 CALL CHECK (NF90_PUT_VAR(ncid, lon_varid, lon_all))
-CALL CHECK (NF90_PUT_VAR(ncid, z_varid, zc))
+CALL CHECK (NF90_PUT_VAR(ncid, z_varid, zc_o))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
