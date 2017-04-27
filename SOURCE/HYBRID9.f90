@@ -216,7 +216,12 @@ REAL :: wh      ! smpfz (jwt) - z (jwt)                             (mm)
 REAL :: qcharge_tot
 REAL :: qcharge_layer
 REAL :: s_y ! Specific yield
-REAL :: zwtmm   ! Water table depth                                 (mm)
+REAL :: zwtmm    ! Water table depth                                (mm)
+REAL :: rsub_top ! Subsurface runoff - topographic control        (mm/s)
+REAL :: rsub_top_max
+REAL :: rsub_top_tot
+REAL :: rsub_top_layer
+REAL :: xsi ! Excess soil water above saturation at layer I         (mm)
 !----------------------------------------------------------------------!
 ! Water available for evaporation over timestep                (mm s-1).
 !----------------------------------------------------------------------!
@@ -378,6 +383,10 @@ REAL, DIMENSION (:), ALLOCATABLE :: theta
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:), ALLOCATABLE :: vol_eq
 !----------------------------------------------------------------------!
+! Porosity of soil (mm^3/mm^3).
+!----------------------------------------------------------------------!
+REAL, DIMENSION (:), ALLOCATABLE :: eff_porosity
+!----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! Miscellaneous parameters.
@@ -499,6 +508,11 @@ ALLOCATE (theta (nsoil_layers_max))
 !----------------------------------------------------------------------!
 ALLOCATE (vol_eq (nsoil_layers_max+1))
 !----------------------------------------------------------------------!
+! Porosity of soil (mm^3/mm^3).
+!----------------------------------------------------------------------!
+ALLOCATE (eff_porosity (nsoil_layers_max))
+!----------------------------------------------------------------------!
+
 
 !----------------------------------------------------------------------!
 ALLOCATE (theta_sum(nsoil_layers_max)) ! For diagnostics   (mm^3 mm^-3).
@@ -1368,6 +1382,11 @@ DO iDEC = iDEC_start, iDEC_end
 ! Start of CESM 'Infiltration'.
 !**********************************************************************!
 
+            DO I = 1, nlayers
+              ! Porosity of soil.
+              eff_porosity (I) = MAX (0.01, theta_s(I,x,y))
+            END DO
+
             !----------------------------------------------------------!
             ! Local evaporation (mm/s).
             !----------------------------------------------------------!
@@ -1980,7 +1999,6 @@ DO iDEC = iDEC_start, iDEC_end
             rous = MAX (rous, 0.02)
             !----------------------------------------------------------!
 
-!write (*,*) 'wa',wa(x,y),qcharge*dt,wa (x,y) + qcharge * dt
             !----------------------------------------------------------!
             ! Water table is below the soil column.
             !----------------------------------------------------------!
@@ -2034,7 +2052,6 @@ DO iDEC = iDEC_start, iDEC_end
                 IF (qcharge_tot > 0.0) zwt (x,y) = &
                   zwt (x,y) - qcharge_tot / 1000.0 / rous
               END IF
-!write (*,*) 'new zwt =',zwt(x,y)
               !--------------------------------------------------------!
               ! Recompute jwt for following calculations.
               ! Allow jwt to equal zero when zwt is in top layer.
@@ -2051,24 +2068,114 @@ DO iDEC = iDEC_start, iDEC_end
             END IF
             !----------------------------------------------------------!
 
-            ! Baseflow.
-            ! Perched water table code.
-            ! Specify maximum drainage rate.
-            !q_perch_max = 1.0E-5 * SIN (topo_slope * (rpi / 180.0))
+            !----------------------------------------------------------!
+            ! Recompute water table height (mm).
+            !----------------------------------------------------------!
+            zwtmm = 1000.0 * zwt (x,y)
+            !----------------------------------------------------------!
 
-            !w1 = 0.0
-            !do i = 1, nlayers
-            !  w1 = w1 + dwat2 (i) * dz (i)
-            !end do
-!write (*,*) 'qflx_infl',qflx_infl*dt
-            !write (*,*) 'balance:',w1,qflx_evap_grnd*dt,qcharge*dt,prec*dt
-            !write (*,*) 'balance:',w1+(qflx_evap_grnd+qcharge-prec)*dt
+            !----------------------------------------------------------!
+            ! Baseflow.
+            ! 'Original formulation' does not use perched water table
+            ! drainage, so go with that for now, only computing
+            ! topographic runoff.
+            !----------------------------------------------------------!
+            rsub_top_max = 5.5E-3
+            !----------------------------------------------------------!
+            ! Subsurface runoff - topographic control (mm/s).
+            !----------------------------------------------------------!
+            rsub_top = rsub_top_max * EXP (-fff * zwt (x,y))
+            !----------------------------------------------------------!
+            ! Use analytical expression for aquifer specific yield (-).
+            !----------------------------------------------------------!
+            rous = theta_s (nlayers,x,y) &
+                   * (1.0 - (1.0 + zwtmm / (-psi_s (nlayers,x,y))) &
+                   ** (-1.0 / bsw (nlayers,x,y)))
+            rous = MAX (rous, 0.02)
+            !----------------------------------------------------------!
+
+            !----------------------------------------------------------!
+            ! Water table is below the soil column.
+            !----------------------------------------------------------!
+            IF (jwt == nlayers) THEN
+              !--------------------------------------------------------!
+              wa (x,y) = wa (x,y) - rsub_top * dt
+              zwt (x,y) = zwt (x,y) + (rsub_top * dt) / 1000.0 / rous
+              h2osoi_liq (nlayers,x,y) = h2osoi_liq (nlayers,x,y) + &
+                                     MAX (0.0, (wa (x,y) - 5000.0))
+              wa (x,y) = MIN (wa (x,y), 5000.0)
+              !--------------------------------------------------------!
+            ELSE ! Water table within soil layers 1-8.
+              !--------------------------------------------------------!
+              ! Now remove water via rsub_top.
+              !--------------------------------------------------------!
+              rsub_top_tot = -rsub_top * dt
+              !--------------------------------------------------------!
+              ! Deepening water table, of course.
+              DO I = jwt + 1, nlayers
+                ! Use analytical expression for specific yield.
+                s_y = theta_s (I,x,y) &
+                      * (1.0 - (1.0 + zwtmm / (-psi_s (I,x,y))) &
+                      ** (-1.0 / bsw (I,x,y)))
+                s_y = MAX (s_y, 0.02)
+                
+                rsub_top_layer = MAX (rsub_top_tot, &
+                                 -(s_y * (zi (I) - zwtmm)))
+                rsub_top_layer = MIN (rsub_top_layer, 0.0)
+                h2osoi_liq (I,x,y) = h2osoi_liq (I,x,y) + rsub_top_layer
+
+                rsub_top_tot = rsub_top_tot - rsub_top_layer
+
+                IF (rsub_top_tot >= 0.0) THEN
+                  zwt (x,y) = zwt (x,y) - rsub_top_layer / s_y / 1000.0
+                  EXIT
+                ELSE
+                  zwt (x,y) = zi (I)
+                ENDIF
+              END DO ! I = jwt + 1, nlayers
+              ! Remove residual rsub_top.
+              zwt (x,y) = zwt (x,y) - rsub_top_tot / 1000.0 / rous
+              wa  (x,y) = wa  (x,y) + rsub_top_tot
+              !--------------------------------------------------------!
+
+              !--------------------------------------------------------!
+              ! Recompute jwt. Allow it to equal zero when zwt is in top
+              ! layer.
+              !--------------------------------------------------------!
+              jwt = nlayers
+              DO I = 1, nlayers
+                IF (zwt (x,y) <= (zi (I) / 1000.0)) then
+                    jwt = I - 1
+                    EXIT
+                END IF
+              END DO
+              !--------------------------------------------------------!
+            END IF ! End of jwt IF construct.
+
+            !----------------------------------------------------------!
+            zwt (x,y) = MAX ( 0.0, zwt (x,y))
+            zwt (x,y) = MIN (80.0, zwt (x,y))
+            !----------------------------------------------------------!
+
+            !----------------------------------------------------------!
+            ! Excessive water above saturation added to the above
+            ! unsaturated layer like a bucket if column fully saturated,
+            ! excess water goes to runoff.
+            !----------------------------------------------------------!
+            DO I = nlayers, 2, -1
+              xsi = MAX (h2osoi_liq (I,x,y) - eff_porosity (I) * &
+                    dz (I), 0.0)
+              h2osoi_liq (I,x,y) = MIN (eff_porosity (I) * &
+                                   dz (I), h2osoi_liq (I,x,y))
+              h2osoi_liq(I-1,x,y) = h2osoi_liq(I-1,x,y) + xsi
+            END DO
+            !----------------------------------------------------------!
 
             !----------------------------------------------------------!
             ! Sum all losses from soil column (mm).
             !----------------------------------------------------------!
             w1 = ((1.0 - frac_h2osfc) * (qflx_surf + qflx_evap_grnd) + &
-                 SUM (rnff (:))) * dt + wa (x,y)
+                 rsub_top) * dt + wa (x,y)
             !----------------------------------------------------------!
             DO I = 1, nlayers
               !--------------------------------------------------------!
