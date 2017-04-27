@@ -22,7 +22,7 @@ PROGRAM H9
 ! Uses PGF forcings, 1901-2012.
 !----------------------------------------------------------------------!
 ! Andrew D. Friend
-! 18th April, 2017
+! 27th April, 2017
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -181,8 +181,9 @@ REAL, ALLOCATABLE :: theta_sum (:)
 REAL :: thetan ! New theta for testing over/undersaturation   (mm3 mm-3)
 REAL :: dtheta ! Time derivative of theta                 (mm3 mm-3 s-1)
 REAL :: qflx_prec_grnd_rain ! Rain precip. incident on ground     (mm/s)
-REAL :: qflx_top_soil ! Net water input into soil from top        (mm/s)
-REAL :: qflx_in_soil  ! Surface input to soil                     (mm/s)
+REAL :: qflx_top_soil  ! Net water input into soil from top       (mm/s)
+REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
+REAL :: qflx_in_h2osfc ! Surface input to h2osfc                  (mm/s)
 REAL :: qflx_surf   ! Surface runoff                              (mm/s)
 REAL :: hkdepth     ! Decay factor                                   (m)
 REAL :: fff         ! Decay factor                                  (/m)
@@ -194,6 +195,7 @@ REAL :: qflx_infl ! Infiltration                                  (mm/s)
 REAL :: qinmax    ! Maximum infiltration capacity                 (mm/s)
 REAL :: qflx_infl_excess ! Infiltration excess runoff -> h2osfc   (mm/s)
 REAL :: qflx_evap      ! Local evaporation                        (mm/s)
+REAL :: qflx_ev_h2osfc ! Evaporative flux from h2osfc             (mm/s)
 REAL :: qflx_evap_grnd ! Ground surface evaporation rate          (mm/s)
 REAL :: dt     ! Integration timestep                                (s)
 REAL :: dflux  ! Negative runoff removal                        (mm s-1)
@@ -214,6 +216,7 @@ REAL :: wh      ! smpfz (jwt) - z (jwt)                             (mm)
 REAL :: qcharge_tot
 REAL :: qcharge_layer
 REAL :: s_y ! Specific yield
+REAL :: zwtmm   ! Water table depth                                 (mm)
 !----------------------------------------------------------------------!
 ! Water available for evaporation over timestep                (mm s-1).
 !----------------------------------------------------------------------!
@@ -257,7 +260,7 @@ REAL :: rnf
 !----------------------------------------------------------------------!
 ! For soil water diagnostics.
 !----------------------------------------------------------------------!
-REAL :: w0,w1
+REAL :: w0,w1,w2
 !----------------------------------------------------------------------!
 ! Saturated hydraulic conductivity at soil layer interface      (mm s-1).
 !----------------------------------------------------------------------!
@@ -678,7 +681,7 @@ ALLOCATE (axy_evap    (lon_c,lat_c,NYR)) ! Accumulated evap.
 !----------------------------------------------------------------------!
 ALLOCATE (h2osoi_liq (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
-! Water table depth (mm).
+! Water table depth (m).
 !----------------------------------------------------------------------!
 ALLOCATE (zwt (lon_c,lat_c))
 !----------------------------------------------------------------------!
@@ -986,9 +989,9 @@ DO y = 1, lat_c
       !----------------------------------------------------------------!
     END DO
     !------------------------------------------------------------------!
-    ! Initial water table depth from p. 28 of O13 (mm).
+    ! Initial water table depth from p. 28 of O13 (m).
     !------------------------------------------------------------------!
-    zwt (x,y) = zi (nlayers) + 5000.0
+    zwt (x,y) = (zi (nlayers) + 5000.0) / 1000.0
     !------------------------------------------------------------------!
     ! Initial water stored in the unconfined aquifer and unsaturated
     ! soil from p. 28 of O13 (mm).
@@ -1022,7 +1025,7 @@ var_name = 'soil_tex'
 !----------------------------------------------------------------------!
 CALL WRITE_NET_CDF_2DI (soil_tex)
 !----------------------------------------------------------------------!
-
+write (*,*) 'here'
 !----------------------------------------------------------------------!
 ! time is days since 1860-01-01, so first time is 0. Is actually 1.
 ! Climate input 1901 starts Time = 14975.
@@ -1206,8 +1209,8 @@ DO iDEC = iDEC_start, iDEC_end
             ! Precipitation flux (mm s-1).
             !----------------------------------------------------------!
             prec = 1.0E3 * pr (x,y,iT) / rhow
-!prec = 10.0 / 86400.0 !*****************
-!prec = 0.0 !**************
+!write (*,*) '**************************************'
+!write (*,*) 'prec',prec*dt
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1228,6 +1231,8 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
             END DO
             !----------------------------------------------------------!
+!write (*,*) 'w0',w0,w0-prec*dt
+!write (*,*) 'wa',wa(x,y)
 
 !**********************************************************************!
 ! Start of CESM 'SLakeHydrology'.
@@ -1273,7 +1278,6 @@ DO iDEC = iDEC_start, iDEC_end
             ! Fractional area with water table at surface (-).
             !----------------------------------------------------------!
             fsat = wtfact * EXP (-0.5 * fff * zwt (x,y))
-!fsat = 0.0 !***************
             !----------------------------------------------------------!
 !write (*,*) -0.5*fff*zwt(x,y),zwt(x,y)
 
@@ -1287,7 +1291,11 @@ DO iDEC = iDEC_start, iDEC_end
             ! Surface runoff (mm/s).
             !----------------------------------------------------------!
             qflx_surf = fcov * qflx_top_soil
+!write (*,*) 'qflx_surf=',qflx_surf*dt,fsat
             !----------------------------------------------------------!
+!write (*,*) 'zwt fsat',zwt (x,y),fsat
+!write (*,*) prec*dt,qflx_top_soil*dt,qflx_surf*dt,&
+            !theta(1)/theta_s(1,x,y)
 
 !**********************************************************************!
 ! End of CESM 'SurfaceRunoff'.
@@ -1299,7 +1307,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Set to zero for now.
             !----------------------------------------------------------!
             !frac_h2osfc = fsat
-            frac_h2osfc = 0.0 !****
+            frac_h2osfc = 0.0 !***************!
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1311,7 +1319,7 @@ DO iDEC = iDEC_start, iDEC_end
               beta = 0.0
             END IF
 !beta = 0.0 !************
-!write (*,*) beta,theta(1),theta_s(1,x,y),h2osoi_liq (1,x,y)
+!write (*,*) iTIME,beta,theta(1),theta_s(1,x,y),zwt(x,y)
 !if (beta < 0.0) stop
             !----------------------------------------------------------!
             ! Virtual potential surface temperature                 (K).
@@ -1348,6 +1356,13 @@ DO iDEC = iDEC_start, iDEC_end
             qflx_evap_grnd = MAX (zero, qflx_evap_grnd)
             qflx_evap_grnd = MIN (evap_max,qflx_evap_grnd)
             !----------------------------------------------------------!
+            ! Evaporative flux from h2osfc (mm/s).
+            !----------------------------------------------------------!
+            qflx_ev_h2osfc = rho3 * cna * &
+                          (qb - qb * rhs (x,y,iT) / 100.0)
+            qflx_ev_h2osfc = MAX (zero, qflx_ev_h2osfc)
+            qflx_ev_h2osfc = MIN (evap_max,qflx_ev_h2osfc)
+            !----------------------------------------------------------!
 
 !**********************************************************************!
 ! Start of CESM 'Infiltration'.
@@ -1357,6 +1372,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Local evaporation (mm/s).
             !----------------------------------------------------------!
             qflx_evap = qflx_evap_grnd
+!write (*,*) 'qflx_evap',qflx_evap*dt,frac_h2osfc
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1364,6 +1380,7 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             qflx_in_soil = (1.0 - frac_h2osfc) * &
                            (qflx_top_soil - qflx_surf)
+            qflx_in_h2osfc = frac_h2osfc * (qflx_top_soil - qflx_surf)
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1371,7 +1388,11 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             qflx_in_soil = qflx_in_soil - &
                            (1.0 - frac_h2osfc) * qflx_evap
+            qflx_in_h2osfc = qflx_in_h2osfc - &
+                             frac_h2osfc * qflx_ev_h2osfc
             !----------------------------------------------------------!
+!write (*,*) 'qflx_in_soil',qflx_in_soil*dt
+!write (*,*) 'evap in',qflx_evap*dt,qflx_in_soil*dt
 
             !----------------------------------------------------------!
             ! Maximum infiltration capacity (mm/s).
@@ -1384,12 +1405,14 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             qflx_infl_excess = MAX (0.0, qflx_in_soil - &
                                (1.0 - frac_h2osfc) * qinmax)
+!write (*,*) 'qflx_infl_excess',qflx_infl_excess*dt
             !----------------------------------------------------------!
-
+!write (*,*) 'qinmax',qinmax*dt,qflx_infl_excess
             !----------------------------------------------------------!
             ! Soil infiltration (mm/s).
             !----------------------------------------------------------!
             qflx_infl = qflx_in_soil - qflx_infl_excess
+!write (*,*) 'qflx_infl',qflx_infl*dt
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -1407,6 +1430,14 @@ DO iDEC = iDEC_start, iDEC_end
 !**********************************************************************!
 ! Start of CESM 'SoilWater'.
 !**********************************************************************!
+!write (*,*) 'zwt wa',zwt(x,y),wa(x,y)
+
+            !----------------------------------------------------------!
+            ! Water table depth (mm).
+            !----------------------------------------------------------!
+            zwtmm = 1000.0 * zwt (x,y)
+            !----------------------------------------------------------!
+!write (*,*) 'zwtmm',zwtmm
 
             !----------------------------------------------------------!
             ! Compute jwt index, the index of the first unsaturated
@@ -1414,10 +1445,10 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             jwt = nlayers
             !----------------------------------------------------------!
-            ! Allow jwt to equal zero when zwt is in top layer.
+            ! Allow jwt to equal zero when zwtmm is in top layer.
             !----------------------------------------------------------!
             DO I = 1, nlayers
-              IF (zwt (x,y) <= zi (I)) THEN
+              IF (zwt (x,y) <= (zi (I) / 1000.0)) THEN
                 jwt = I - 1
                 EXIT
               END IF
@@ -1433,27 +1464,27 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             DO I = 1, nlayers
               !--------------------------------------------------------!
-              IF (zwt (x,y) <= zi (I-1)) THEN
+              IF (zwtmm <= zi (I-1)) THEN
                 !------------------------------------------------------!
                 ! If layer below water table depth, all saturated.
                 !------------------------------------------------------!
                 vol_eq (I) = theta_s (I,x,y)
                 !------------------------------------------------------!
-              ELSE IF ((zwt (x,y) < zi (I)) &
-                      .AND. (zwt (x,y) > zi (I-1))) THEN
+              ELSE IF ((zwtmm < zi (I)) &
+                      .AND. (zwtmm > zi (I-1))) THEN
                 !------------------------------------------------------!
                 ! If water table top in layer, use weighted average from
                 ! the saturated part (depth > wtd) and the equilibrium
                 ! solution for the rest of the layer.
                 !------------------------------------------------------!
                 tempi = 1.0
-                temp0 = ((((-psi_s (I,x,y)) + zwt (x,y) - zi (I-1)) &
+                temp0 = ((((-psi_s (I,x,y)) + zwtmm - zi (I-1)) &
                         / (-psi_s (I,x,y)))) ** (1.0 - 1.0 / bsw(I,x,y))
                 voleq1 = psi_s (I,x,y) * theta_s (I,x,y) / &
-                         (1.0 - 1.0 / bsw (I,x,y)) / (zwt (x,y) &
+                         (1.0 - 1.0 / bsw (I,x,y)) / (zwtmm &
                          -zi (I-1)) * (tempi - temp0)
-                vol_eq (I) = (voleq1 * (zwt (x,y) - zi (I-1)) &
-                             + theta_s (I,x,y) * (zi (I) - zwt (x,y))) &
+                vol_eq (I) = (voleq1 * (zwtmm - zi (I-1)) &
+                             + theta_s (I,x,y) * (zi (I) - zwtmm)) &
                              / (zi (I) - zi (I-1))
                 vol_eq (I) = MIN (theta_s (I,x,y), vol_eq (I))
                 vol_eq (I) = MAX (vol_eq (I), 0.0)
@@ -1462,10 +1493,10 @@ DO iDEC = iDEC_start, iDEC_end
                 !------------------------------------------------------!
                 ! Water table below this layer.
                 !------------------------------------------------------!
-                tempi = (((-psi_s (I,x,y) + zwt (x,y) - zi (I)) &
+                tempi = (((-psi_s (I,x,y) + zwtmm - zi (I)) &
                         / (-psi_s (I,x,y)))) ** &
                        (1.0 - 1.0 / bsw (I,x,y))
-                temp0 = (((-psi_s (I,x,y) + zwt (x,y) - zi (I-1)) &
+                temp0 = (((-psi_s (I,x,y) + zwtmm - zi (I-1)) &
                         / (-psi_s (I,x,y)))) ** &
                        (1.0 - 1.0 / bsw (I,x,y))
                 vol_eq (I) = psi_s (I,x,y) * theta_s (I,x,y) &
@@ -1481,6 +1512,8 @@ DO iDEC = iDEC_start, iDEC_end
                        ** (-bsw (I,x,y))
               zq (I) = MAX (smpmin, zq (I))
               !--------------------------------------------------------!
+!write (*,*) 'I zq vol_eq theta'
+!write (*,*) I,zq(I),vol_eq(I),theta(I)
             END DO
             !----------------------------------------------------------!
 
@@ -1493,11 +1526,11 @@ DO iDEC = iDEC_start, iDEC_end
             IF (jwt == nlayers) THEN
               !--------------------------------------------------------!
               tempi = 1.0
-              temp0 = (((-psi_s (I,x,y) + zwt (x,y) - zi (I)) / &
+              temp0 = (((-psi_s (I,x,y) + zwtmm - zi (I)) / &
                       (-psi_s (I,x,y)))) ** (1.0 - 1.0 / bsw (I,x,y))
               vol_eq (I+1) = psi_s (I,x,y) * theta_s (I,x,y) / &
                              (1.0 - 1.0 / bsw (I,x,y)) &
-                             / (zwt (x,y) - zi (I)) * (tempi - temp0)
+                             / (zwtmm - zi (I)) * (tempi - temp0)
               vol_eq (I+1) = MAX (vol_eq (I+1), 0.0)
               vol_eq (I+1) = MIN (theta_s (I,x,y), vol_eq (I+1))
               zq (I+1) = psi_s (I,x,y) * (MAX (vol_eq (I+1) &
@@ -1505,8 +1538,10 @@ DO iDEC = iDEC_start, iDEC_end
               zq (I+1) = MAX (smpmin, zq (I+1))
               !--------------------------------------------------------!
             END IF
+!write (*,*) I+1,zq(I+1),vol_eq(I+1)
             !----------------------------------------------------------!
 
+            !----------------------------------------------------------!
             ! Hydraulic conductivity and soil matric potential and their
             ! derivatives.
             ! I refers to bottom of layer.
@@ -1552,7 +1587,10 @@ DO iDEC = iDEC_start, iDEC_end
               dsmpdw (I) = (-bsw (I,x,y)) * smp (I) / &
                            (s_node * theta_s (I,x,y))
               !--------------------------------------------------------!
+!write (*,*) psi_s(I,x,y),bsw (I,x,y),psi_s (I,x,y)*(theta (I) / theta_s (I,x,y))**(-bsw (I,x,y))
+!write (*,*) I,xk(I),smp(I),theta(I),h2osoi_liq (I,x,y)
             END DO
+            !----------------------------------------------------------!
 
             !----------------------------------------------------------!
             ! Surface runoff (mm s-1).
@@ -1601,14 +1639,15 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             ! Aquifer (9th) layer ('zmm' == zc).
             !----------------------------------------------------------!
-            zc (nlayers+1) = 0.5 * (zwt (x,y) + zc (nlayers))
+            zc (nlayers+1) = 0.5 * (zwtmm + zc (nlayers))
+!write (*,*) 'zc(nlayers+1)',zc(nlayers+1)
             IF (jwt < nlayers) THEN
               dz (nlayers+1) = dz (nlayers)
             ELSE
-              dz (nlayers+1) = zwt (x,y) - zc (nlayers)
+              dz (nlayers+1) = zwtmm - zc (nlayers)
             ENDIF
             !----------------------------------------------------------!
-
+!write (*,*) 'dz(nlayers+1)',dz(nlayers+1)
 !w1 = 0.0
 !do i = 1, nlayers
 !  w1 = w1 + h2osoi_liq (I,x,y)
@@ -1666,8 +1705,6 @@ DO iDEC = iDEC_start, iDEC_end
             END DO ! I = 2, nlayers - 1
             !----------------------------------------------------------!
 
-!xk (nlayers) = 0.0 !*************
-
             !----------------------------------------------------------!
             ! Now compute matrix elements for fluxes at base of soil
             ! column.
@@ -1721,7 +1758,7 @@ DO iDEC = iDEC_start, iDEC_end
               den   = zc  (I) - zc  (I-1)
               dzq = zq  (I) - zq  (I-1)
               num   = smp (I) - smp (I-1) - dzq
-              qin (I) = -xk (I) * num / den
+              qin (I) = -xk (I-1) * num / den
               dqidw0 (I) = -(-xk(I-1) * dsmpdw (I-1) + &
                            num * dhkdw (I-1)) / den
               dqidw1 (I) = -( xk(I-1) * dsmpdw (I)   + &
@@ -1799,6 +1836,29 @@ DO iDEC = iDEC_start, iDEC_end
               dwat (I) = dwat2 (I)
             END DO
             !----------------------------------------------------------!
+!write (*,*) 'dwat2(nlayers+1)',dwat2(nlayers+1)
+!write (*,*) 'qin(1)',qin(1)*dt
+!write (*,*) 'qout(nlayers)',qout(nlayers)*dt
+!write (*,*) 'check of tridiag solution.'
+!write (*,*) (qin(1)-qout(1)) * dt,smp(1),qin(1)*dt,qout(1)*dt
+!write (*,*) qin (1) - qout(1), bmx(1)*dwat2(1)+cmx(1)*dwat2(1+1)
+!do i = 2, nlayers-1
+!write (*,*) (qin(I)-qout(I)) * dt,smp(I),qin(i)*dt,qout(i)*dt
+!write (*,*) qin(I)-qout(I),amx(I)*dwat2(I-1)+bmx(I)*dwat2(I)+cmx
+!(I)*dwat2(I+1)
+!end do
+!write (*,*) 'problem?',qout(nlayers-1)*dt,qin(nlayers)*dt
+!write (*,*) qin (nlayers) * dt,qout(nlayers)*dt
+!write (*,*) qin(nlayers)-qout(nlayers),amx(I)*dwat2(I-1)+bmx(I)*dwat2(I)
+!write (*,*) (qin(nlayers)-qout(nlayers)) * dt,smp(nlayers)
+
+!w1 = qflx_infl*dt
+!do i = 1, nlayers
+!  w1 = w1 + h2osoi_liq(I,x,y)
+!end do
+!write (*,*) 'before************',w1
+
+            !----------------------------------------------------------!
             ! Renew the mass of liquid water also compute qcharge from
             ! dwat in aquifer layer and update in drainage for case
             ! jwt < nlayers.
@@ -1809,6 +1869,14 @@ DO iDEC = iDEC_start, iDEC_end
                                    dwat2 (I) * dz (I)
               !--------------------------------------------------------!
             END DO
+!w2 = 0.0
+!do i = 1, nlayers
+!  w2 = w2 + h2osoi_liq(I,x,y)
+!end do
+!write (*,*) 'after',w2,w2-w1
+
+!write (*,*) 'qflx_infl',qflx_infl*dt
+!write (*,*) 'dwat2(nlayers+1)*dz(nlayers+1)',dwat2(nlayers+1)*dz (nlayers+1)
 
 ! Check tridiagonal solutions.
 ! rate of change in water = water in from top - water out at bottom -
@@ -1854,12 +1922,12 @@ DO iDEC = iDEC_start, iDEC_end
               ! scs: original formulation.
               !--------------------------------------------------------!
               IF (jwt == 0) THEN ! Water table at surface.
-                qcharge = -ka * (wh_zwt - wh) / (zwt (x,y) + 1.0)
+                qcharge = -ka * (wh_zwt - wh) / (zwtmm + 1.0)
               ELSE
                 ! scs: 1/2, assuming flux is at zwt interface,
                 ! saturation deeper than zwt.
                 qcharge = -ka * (wh_zwt - wh)/ &
-                          ((zwt (x,y) - zc (jwt))*2.0)
+                          ((zwtmm - zc (jwt)) * 2.0)
               END IF
               !--------------------------------------------------------!
               ! Limit qcharge (for the first several timesteps).
@@ -1867,15 +1935,18 @@ DO iDEC = iDEC_start, iDEC_end
               qcharge = MAX (-10.0 / dt, qcharge)
               qcharge = MIN ( 10.0 / dt, qcharge)
               !--------------------------------------------------------!
+!write (*,*) 'ka',ka,jwt,wh_zwt,wh,zwtmm,zwt(x,y),zc(jwt)
             ELSE
               !--------------------------------------------------------!
               ! If water table is below soil column, compute qcharge
               ! from dwat2 (9) (mm/s).
               !--------------------------------------------------------!
               qcharge = dwat2 (nlayers+1) * dz (nlayers+1) / dt
+!write (*,*) 'dwat2 (nlayers+1) * dz (nlayers+1) / dt',&
+!dwat2 (nlayers+1) * dz (nlayers+1) / dt
               !--------------------------------------------------------!
             END IF
-!write (*,*) qcharge*dt
+!write (*,*) 'qcharge*dt',qcharge*dt
 
 !**********************************************************************!
 ! End of CESM 'SoilWater'.
@@ -1889,15 +1960,27 @@ DO iDEC = iDEC_start, iDEC_end
             ! Drainage routines.
             !----------------------------------------------------------!
 
+            ! The layer index of the first unsaturated layer, i.e. the
+            ! layer right above the water table.
+            jwt = nlayers
+            ! Allow jwt to equal zero when zwt is in top layer.
+            DO I = 1, nlayers
+              IF (zwt (x,y) <= (zi (I) / 1000.0)) THEN
+                jwt = I - 1
+                EXIT
+              END IF
+            END DO
+
             !----------------------------------------------------------!
             ! Use analytical expression for aquifer specific yield (-).
             !----------------------------------------------------------!
             rous = theta_s (nlayers,x,y) &
-                   * (1.0 - (1.0 + zwt (x,y) / (-psi_s (nlayers,x,y))) &
+                   * (1.0 - (1.0 + zwtmm / (-psi_s (nlayers,x,y))) &
                    ** (-1.0 / bsw (nlayers,x,y)))
             rous = MAX (rous, 0.02)
             !----------------------------------------------------------!
 
+!write (*,*) 'wa',wa(x,y),qcharge*dt,wa (x,y) + qcharge * dt
             !----------------------------------------------------------!
             ! Water table is below the soil column.
             !----------------------------------------------------------!
@@ -1905,8 +1988,8 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               ! Update water in the unconfined aquifer (mm).
               !--------------------------------------------------------!
-              wa = wa + qcharge * dt
-              zwt (x,y) = zwt (x,y) - (qcharge * dt) / rous
+              wa (x,y) = wa (x,y) + qcharge * dt
+              zwt (x,y) = zwt (x,y) - (qcharge * dt) / 1000.0 / rous
               !--------------------------------------------------------!
             ELSE
               !--------------------------------------------------------!
@@ -1918,14 +2001,14 @@ DO iDEC = iDEC_start, iDEC_end
               IF (qcharge_tot > 0.0) THEN ! Rising water table.
                 DO I = jwt+1, 1, -1
                   ! Use analytical expression for specific yield.
-                  s_y = theta_s (I,x,y) * (1.0 - (1.0 + zwt (x,y) &
+                  s_y = theta_s (I,x,y) * (1.0 - (1.0 + zwtmm &
                         / (-psi_s (I,x,y))) ** (-1.0 / bsw (I,x,y)))
                   s_y = MAX (s_y, 0.02)
                   qcharge_layer = MIN (qcharge_tot, &
-                                       s_y * (zwt (x,y) - zi(I-1)))
+                                       s_y * (zwtmm - zi (I-1)))
                   qcharge_layer = MAX (qcharge_layer, 0.0)
                   IF (s_y > 0.0) zwt (x,y) = &
-                    zwt (x,y) - qcharge_layer / s_y
+                    zwt (x,y) - qcharge_layer / s_y / 1000.0
                   qcharge_tot = qcharge_tot - qcharge_layer
                   IF (qcharge_tot <= 0.0) EXIT
                 END DO
@@ -1934,23 +2017,24 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
                 DO I = jwt+1, nlayers
                   ! Use analytical expression for specific yield.
-                  s_y = theta_s (I,x,y) * (1.0 - (1.0 + zwt (x,y) &
+                  s_y = theta_s (I,x,y) * (1.0 - (1.0 + zwtmm &
                         / (-psi_s (I,x,y))) ** (-1.0 / bsw (I,x,y)))
                   s_y = MAX (s_y, 0.02)
                   qcharge_layer = MAX (qcharge_tot, &
-                                  -s_y * (zi (I) - zwt (x,y)))
+                                  -s_y * (zi (I) - zwtmm))
                   qcharge_layer = MIN (qcharge_layer, 0.0)
                   qcharge_tot = qcharge_tot - qcharge_layer
                   IF (qcharge_tot >= 0.0) THEN
-                    zwt (x,y) = zwt (x,y) - qcharge_layer / s_y
+                    zwt (x,y) = zwt (x,y) - qcharge_layer / s_y / 1000.0
                     EXIT
                   ELSE
-                    zwt (x,y) = zi (I)
+                    zwt (x,y) = zi (I) / 1000.0
                   END IF
                 END DO
                 IF (qcharge_tot > 0.0) zwt (x,y) = &
-                  zwt (x,y) - qcharge_tot / rous
+                  zwt (x,y) - qcharge_tot / 1000.0 / rous
               END IF
+!write (*,*) 'new zwt =',zwt(x,y)
               !--------------------------------------------------------!
               ! Recompute jwt for following calculations.
               ! Allow jwt to equal zero when zwt is in top layer.
@@ -1958,8 +2042,8 @@ DO iDEC = iDEC_start, iDEC_end
               jwt = nlayers
               !--------------------------------------------------------!
               DO I = 1, nlayers
-                IF (zwt (x,y) <= zi (I)) THEN
-                  jwt = I-1
+                IF (zwt (x,y) <= (zi (I) / 1000.0)) THEN
+                  jwt = I - 1
                   EXIT
                 END IF
               END DO
@@ -1976,10 +2060,14 @@ DO iDEC = iDEC_start, iDEC_end
             !do i = 1, nlayers
             !  w1 = w1 + dwat2 (i) * dz (i)
             !end do
+!write (*,*) 'qflx_infl',qflx_infl*dt
+            !write (*,*) 'balance:',w1,qflx_evap_grnd*dt,qcharge*dt,prec*dt
             !write (*,*) 'balance:',w1+(qflx_evap_grnd+qcharge-prec)*dt
 
             !----------------------------------------------------------!
-            w1 = (qflx_surf + qflx_evap_grnd + &
+            ! Sum all losses from soil column (mm).
+            !----------------------------------------------------------!
+            w1 = ((1.0 - frac_h2osfc) * (qflx_surf + qflx_evap_grnd) + &
                  SUM (rnff (:))) * dt + wa (x,y)
             !----------------------------------------------------------!
             DO I = 1, nlayers
@@ -1999,7 +2087,10 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
             END DO
             !----------------------------------------------------------!
+!write (*,*) 'w1',w1
 
+!write (*,*) 'wa',wa(x,y)
+!write (*,*) '!*********************************************!'
             !----------------------------------------------------------!
             IF (INTERACTIVE) THEN
             !----------------------------------------------------------!
@@ -2010,9 +2101,10 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             ! Check for conservation of water.
             !----------------------------------------------------------!
-            IF (ABS (w1 - w0) > 1.0) THEN
+!WRITE (*,*) W1-W0
+            IF (ABS (w1 - w0) > 0.1) THEN
               WRITE (*,*)
-              WRITE (*,*) 'Water imbalance > 1.0 mm ',w1-w0
+              WRITE (*,*) 'Water imbalance > 0.1 mm ',w1-w0
               WRITE (*,*) 'DiTIME = ',iTIME-time_BOY (jyear-1859)+1
               WRITE (*,*) 'my_id x y ',my_id,x,y
               WRITE (*,*) 'lon, lat, iTIME ',lon(x),lat(y),iTIME
@@ -2023,10 +2115,11 @@ DO iDEC = iDEC_start, iDEC_end
                           dt*rnf,dt*qflx_evap_grnd
               WRITE (*,*) 'qout (nlayers) = ',qout(nlayers)*dt
               WRITE (*,*) 'zwt = ',zwt(x,y)
-              WRITE (*,*) 'qcharge = ',dwat2(nlayers+1)*dz(nlayers+1)
+              WRITE (*,*) 'qcharge = ',qcharge*dt
               WRITE (*,*) 'pr = ',dt*pr(x,y,iT)
               WRITE (*,*) 'beta = ',beta
               WRITE (*,*) 'wa   =',wa(x,y)
+              WRITE (*,*) 'theta theta_m h2osoi_liq'
               DO I = 1, nlayers
                 WRITE (*,*) I,theta(I),theta_m(I,x,y),h2osoi_liq (I,x,y)
               END DO
@@ -2048,9 +2141,9 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            IF (INTERACTIVE) THEN
-              WRITE (99,*) iT,theta(1),theta(2),theta(8),prec*dt*48.0
-            END IF
+            !IF (INTERACTIVE) THEN
+              !WRITE (99,*) iT,theta(1),theta(2),theta(8),prec*dt*48.0
+            !END IF
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
