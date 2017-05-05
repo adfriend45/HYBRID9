@@ -35,7 +35,7 @@ CHARACTER (LEN = *), PARAMETER :: PSI_S_NAME  = "saturated_psi"
 CHARACTER (LEN = *), PARAMETER :: LON_UNITS        = "degrees_east"
 CHARACTER (LEN = *), PARAMETER :: LAT_UNITS        = "degrees_north"
 CHARACTER (LEN = *), PARAMETER :: PSI_S_UNITS      = "mm"
-CHARACTER (LEN = *), PARAMETER :: DEPTH_UNITS       = "mm"
+CHARACTER (LEN = *), PARAMETER :: DEPTH_UNITS      = "mm"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: UNITS       = "units"
 !----------------------------------------------------------------------!

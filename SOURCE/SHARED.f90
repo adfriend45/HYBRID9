@@ -1,23 +1,32 @@
 !======================================================================!
 MODULE SHARED
 !----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Declare parameters and variables to be shared across routines in
+! HYBRID9.
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
 IMPLICIT NONE
 !----------------------------------------------------------------------!
 SAVE
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
+! Maximum number of soil layers                                      (n)
+!----------------------------------------------------------------------!
 INTEGER, PARAMETER :: nsoil_layers_max = 8
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Number of ground layers                                            (n)
+! Number of ground layers (soil plus aquifer)                        (n)
 !----------------------------------------------------------------------!
 INTEGER, PARAMETER :: Nlevgrnd = 9
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-INTEGER :: my_id             ! Processor ID                         (n).
+INTEGER :: my_id             ! Processor ID                          (n)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -26,70 +35,75 @@ REAL, PARAMETER :: one  = 1.0
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Physical constants                                            (ratio).
+! Physical constants
 !----------------------------------------------------------------------!
-REAL, PARAMETER :: pi = 3.14159
+REAL, PARAMETER :: pi = 3.14159                                ! (ratio)
 !----------------------------------------------------------------------!
-! Density of pure water                                        (kg m-3).
+! Density of pure water                                         (kg/m^3)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: rhow = 1000.0
 !----------------------------------------------------------------------!
-! Molecular weight of dry air                                 (g mol-1).
+! Molecular weight of dry air                                    (g/mol)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: mair = 28.9655
 !----------------------------------------------------------------------!
-! Molecular weight of water vapour                            (g mol-1).
+! Molecular weight of water vapour                               (g/mol)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: mwat = 18.015
 !----------------------------------------------------------------------!
-! Gas constant                                            (J mol-1 K-1).
+! Gas constant                                                 (J/mol/K)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: gasc = 8.314510
 !----------------------------------------------------------------------!
-! Gas constant for air                              (287.05 J K-1 kg-1).
+! Gas constant for air                                   (287.05 J/K/kg)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: rgas = 1000.0 * gasc / mair
 !----------------------------------------------------------------------!
-! Mass ratio of air to water vapour                           (0.62197).
+! Mass ratio of air to water vapour (0.62197)                    (ratio)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: mrat = mwat / mair
 !----------------------------------------------------------------------!
-! 1.0 / mrat                                                   (1.6078).
+! 1.0 / mrat (1.6078)                                            (ratio)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: bymrat = one / mrat
 !----------------------------------------------------------------------!
-! Coefficient of humidity in virtual temperature definition    (0.6078).
+! Coefficient of humidity in virtual temperature definition (0.6078) (?)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: deltx = bymrat - one
 !----------------------------------------------------------------------!
-! Latent heat of evaporation at 0 oC                  (2.5008E6 J kg-1).
+! Latent heat of evaporation at 0 oC (2.5008E60                   (J/kg)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: lhe = 2.5008E6
 !----------------------------------------------------------------------!
-! Gas constant for water vapour                      (461.5 J K-1 kg-1).
+! Gas constant for water vapour (461.5)                         (J/K/kg)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: rvap = 1000.0 * gasc / mwat
 !----------------------------------------------------------------------!
-! Freezing point of water at 1 atm                           (273.16 K).
+! Freezing point of water at 1 atm (273.16)                          (K)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: tf = 273.16
 !----------------------------------------------------------------------!
-! Minimum soil water potential (mm).
+! Minimum soil water potential                                      (mm)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: smpmin = -1.0E8
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Global dimensions (no. grid boxes).
+! Global dimensions (no. half-degree grid-boxes).
 !----------------------------------------------------------------------!
 INTEGER, PARAMETER :: NX = 720
 INTEGER, PARAMETER :: NY = 360
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Longitudes and latitudes at centre of grid-box)               (degree)
+!----------------------------------------------------------------------!
 REAL :: lon_all (NX)
 REAL :: lat_all (NY)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! No. timesteps in input climate files.
+! No. timesteps in input climate files                               (n)
 !----------------------------------------------------------------------!
 INTEGER :: NTIMES
 !----------------------------------------------------------------------!
@@ -110,12 +124,10 @@ INTEGER :: varid ! Variable ID.
 !----------------------------------------------------------------------!
 INTEGER, ALLOCATABLE :: data_in_2DI (:,:) 
 !----------------------------------------------------------------------!
-! Generic 3D input real array.
+
 !----------------------------------------------------------------------!
-REAL, ALLOCATABLE :: data_in_3DR (:,:,:)
-!----------------------------------------------------------------------!
-CHARACTER (LEN = 200) :: file_name         ! Generic filename.
-CHARACTER (LEN = 200) :: var_name          ! Generic variable name.
+CHARACTER (LEN = 200) :: file_name ! Generic filename.
+CHARACTER (LEN = 200) :: var_name  ! Generic variable name.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -131,44 +143,44 @@ REAL, DIMENSION (:,:), ALLOCATABLE :: psi_s_l1_in   ! cm
 !----------------------------------------------------------------------!
 ! Chunks of soil properties of one soil layer gridded to half-degree.
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1 ! 0.001xcm^3/cm^-3
+REAL, DIMENSION (:,:), ALLOCATABLE :: theta_s_l1 ! 0.001xcm^3/cm^3
 REAL, DIMENSION (:,:), ALLOCATABLE :: k_s_l1     ! cm/day
 REAL, DIMENSION (:,:), ALLOCATABLE :: lambda_l1  ! 0.001*unitless
 REAL, DIMENSION (:,:), ALLOCATABLE :: psi_s_l1   ! cm
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of saturated volumetric soil water (cm3 cm-3).
+! Chunk of saturated volumetric soil water                   (cm^3/cm^3)
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: theta_s
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of saturated soil hydralaulic conductivity (mm/s).
+! Chunk of saturated soil hydraulic conductivity                  (mm/s)
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:,:,:), ALLOCATABLE :: k_s
+REAL, DIMENSION (:,:,:), ALLOCATABLE :: hksat
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of pore size distribution index (unitless).
+! Chunk of pore size distribution index                              (-)
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: lambda
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of Clapp and Hornberger "b".
+! Chunk of Clapp and Hornberger "b"                                  (-)
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: bsw
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of saturated capillary potential (mm).
+! Chunk of saturated capillary potential                            (mm)
 !----------------------------------------------------------------------!
-REAL*4, DIMENSION (:,:,:), ALLOCATABLE :: psi_s
+REAL, DIMENSION (:,:,:), ALLOCATABLE :: psi_s
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk of minimum volumetric soil matric potential (cm3 cm-3).
+! Chunk of minimum volumetric soil matric potential           (cm3/cm^3)
 !----------------------------------------------------------------------!
 REAL, DIMENSION (:,:,:), ALLOCATABLE :: theta_m
 !----------------------------------------------------------------------!
@@ -176,25 +188,25 @@ REAL, DIMENSION (:,:,:), ALLOCATABLE :: theta_m
 !----------------------------------------------------------------------!
 ! Chunk arrays of longitudes and latitudes.
 !----------------------------------------------------------------------!
-REAL, ALLOCATABLE :: lon (:) ! Longitude (degrees east).
-REAL, ALLOCATABLE :: lat (:) ! Latitude (degrees north).
+REAL, ALLOCATABLE :: lon (:)                  ! Longitude (degrees east)
+REAL, ALLOCATABLE :: lat (:)                  ! Latitude (degrees north)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk arrays of processor IDs, soil textures, and slopes.
+! Chunk arrays of processor IDs, soil textures, slopes, and Fmax.
 !----------------------------------------------------------------------!
-INTEGER, ALLOCATABLE :: block_sub (:,:) ! Processor IDs.
-INTEGER, ALLOCATABLE :: soil_tex  (:,:) ! Soil texture.
- ! Gridcell topographic slope (deg).
-REAL, ALLOCATABLE :: topo_slope  (:,:)
+INTEGER, ALLOCATABLE :: block_sub  (:,:) ! Processor IDs             (-)
+INTEGER, ALLOCATABLE :: soil_tex   (:,:) ! Soil texture from HWSD    (-)
+![topo_slope not yet used]
+REAL, ALLOCATABLE    :: topo_slope (:,:) ! Gridcell topo. slope    (deg)
+REAL, ALLOCATABLE    :: Fmax       (:,:) ! Max. sat. fraction (fraction)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Soil layer node depths, positive downwards from surface = 0 mm    (mm)
+! Ground layer node depths, positive downwards from surface = 0 mm  (mm)
 !----------------------------------------------------------------------!
-REAL, DIMENSION (:), ALLOCATABLE :: zsoi
 REAL, DIMENSION (:), ALLOCATABLE :: zc
-REAL, DIMENSION (:), ALLOCATABLE :: zc_o
+REAL, DIMENSION (:), ALLOCATABLE :: zc_o ! Just soil layers for diag.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -204,13 +216,13 @@ REAL, ALLOCATABLE :: h2osoi_liq (:,:,:)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk array of water table depth                                  (mm)
+! Chunk array of water table depth                                   (m)
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: zwt (:,:)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Chunk array of water in the unconfined aquifer (mm)
+! Chunk array of water in the unconfined aquifer                    (mm)
 !----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: wa (:,:)
 !----------------------------------------------------------------------!
@@ -218,14 +230,17 @@ REAL, ALLOCATABLE :: wa (:,:)
 !----------------------------------------------------------------------!
 ! Chunck arrays of diagnostics.
 !----------------------------------------------------------------------!
-REAL, ALLOCATABLE :: axy_rnf         (:,:,:)
-REAL, ALLOCATABLE :: axy_evap        (:,:,:)
-REAL, ALLOCATABLE :: axy_tas         (:,:,:)
-REAL, ALLOCATABLE :: axy_huss        (:,:,:)
-REAL, ALLOCATABLE :: axy_ps          (:,:,:)
-REAL, ALLOCATABLE :: axy_pr          (:,:,:)
-REAL, ALLOCATABLE :: axy_rhs         (:,:,:)
+REAL, ALLOCATABLE :: axy_rnf         (:,:,:) ! Mean annual run-off(mm/s)
+REAL, ALLOCATABLE :: axy_evap        (:,:,:) ! Mean annual evap.  (mm/s)
+REAL, ALLOCATABLE :: axy_tas         (:,:,:) ! Mean annual tas       (K)
+REAL, ALLOCATABLE :: axy_huss        (:,:,:) ! Mean annual huss  (kg/kg)
+REAL, ALLOCATABLE :: axy_ps          (:,:,:) ! Mean annual ps       (Pa)
+REAL, ALLOCATABLE :: axy_pr          (:,:,:) ! Mean annual pr (kg/m^2/s)
+REAL, ALLOCATABLE :: axy_rhs         (:,:,:) ! Mean annual rhs    (%age)
+!----------------------------------------------------------------------!
+! Mean annual volumetric water content by soil layer            (m3/m^3)
 REAL, ALLOCATABLE :: axy_theta       (:,:,:,:)
+!----------------------------------------------------------------------!
 REAL, ALLOCATABLE :: axy_theta_total (:,:,:)
 !----------------------------------------------------------------------!
 
