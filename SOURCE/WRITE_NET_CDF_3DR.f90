@@ -28,6 +28,7 @@ INTEGER :: lon_dimid,lat_dimid,z_dimid ! Dimension IDs.
 INTEGER :: lon_varid
 INTEGER :: lat_varid
 INTEGER :: z_varid
+INTEGER :: plm_varid
 INTEGER :: rnf_varid
 INTEGER :: evap_varid
 INTEGER :: tas_varid
@@ -44,6 +45,7 @@ REAL :: fillval
 CHARACTER (LEN = *), PARAMETER :: LON_NAME    = "longitude"
 CHARACTER (LEN = *), PARAMETER :: LAT_NAME    = "latitude"
 CHARACTER (LEN = *), PARAMETER :: DEPTH_NAME  = "layer_centre_depth"
+CHARACTER (LEN = *), PARAMETER :: PLM_NAME    = "plant mass"
 CHARACTER (LEN = *), PARAMETER :: RNF_NAME    = "runoff"
 CHARACTER (LEN = *), PARAMETER :: EVAP_NAME   = "evaporation"
 CHARACTER (LEN = *), PARAMETER :: TAS_NAME    = "temperature"
@@ -56,6 +58,7 @@ CHARACTER (LEN = *), PARAMETER :: THETAS_NAME = "soil_water_layers"
 !----------------------------------------------------------------------!
 CHARACTER (LEN = *), PARAMETER :: LON_UNITS        = "degrees_east"
 CHARACTER (LEN = *), PARAMETER :: LAT_UNITS        = "degrees_north"
+CHARACTER (LEN = *), PARAMETER :: PLM_UNITS        = "g[DM]"
 CHARACTER (LEN = *), PARAMETER :: RNF_UNITS        = "mm/s"
 CHARACTER (LEN = *), PARAMETER :: EVAP_UNITS       = "mm/s"
 CHARACTER (LEN = *), PARAMETER :: TAS_UNITS        = "K"
@@ -129,6 +132,8 @@ dimids_three = (/z_dimid,lon_dimid,lat_dimid/)
 !----------------------------------------------------------------------!
 ! Define the data variables.
 !----------------------------------------------------------------------!
+CALL CHECK (nf90_def_var(ncid, PLM_NAME  , NF90_float, &
+  dimids_two, plm_varid))
 CALL CHECK (nf90_def_var(ncid, RNF_NAME  , NF90_float, &
   dimids_two, rnf_varid))
 CALL CHECK (nf90_def_var(ncid, EVAP_NAME , NF90_float, &
@@ -152,6 +157,7 @@ CALL CHECK (nf90_def_var(ncid, THETAS_NAME, NF90_float, &
 !----------------------------------------------------------------------!
 ! Assign units attributed to variables.
 !----------------------------------------------------------------------!
+CALL CHECK (NF90_PUT_ATT(ncid, plm_varid, UNITS, PLM_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, rnf_varid, UNITS, RNF_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, evap_varid,UNITS, EVAP_UNITS))
 CALL CHECK (NF90_PUT_ATT(ncid, tas_varid, UNITS, TAS_UNITS))
@@ -168,6 +174,7 @@ CALL CHECK (NF90_PUT_ATT(ncid, thetaz_varid,UNITS, THETA_UNITS))
 ! Define the fill values to be used where there are no data.
 !----------------------------------------------------------------------!
 fillval = zero / zero
+CALL CHECK (nf90_PUT_ATT(ncid, plm_varid   , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, rnf_varid   , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, evap_varid  , "_FillValue", fillval))
 CALL CHECK (nf90_PUT_ATT(ncid, tas_varid   , "_FillValue", fillval))
@@ -215,6 +222,8 @@ count_three = (/nsoil_layers_max,lon_c,lat_c/)
 !----------------------------------------------------------------------!
 ! Write the data to the netCDF file. Each processor writes one chunk.
 !----------------------------------------------------------------------!
+CALL CHECK(nf90_put_var(ncid, plm_varid  , axy_plant_mass  (:,:,iyr), &
+  start = start_two, count = count_two))
 CALL CHECK(nf90_put_var(ncid, rnf_varid  , axy_rnf  (:,:,iyr), &
   start = start_two, count = count_two))
 CALL CHECK(nf90_put_var(ncid, evap_varid , axy_evap (:,:,iyr), &
