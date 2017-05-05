@@ -70,7 +70,7 @@ INTEGER :: iDEC_end          ! Index of last decade in simulation    (-)
 INTEGER :: jyear             ! Calendar year                        (CE)
 INTEGER :: syr               ! First year in decade                 (CS)
 INTEGER :: eyr               ! Last year in decade                  (CE)
-INTEGER :: I,J               ! Generic loop indices                  (-)
+INTEGER :: I,J,K             ! Generic loop indices                  (-)
 INTEGER :: NISURF            ! No. timepoints in day                 (-)
 INTEGER :: NS                ! Timepoints in day index               (-)
 INTEGER :: nt                ! No. timesteps in year              (days)
@@ -162,6 +162,7 @@ REAL, ALLOCATABLE :: rhs (:,:,:)
 !----------------------------------------------------------------------!
 ! Annual sums for diagnostics.
 !----------------------------------------------------------------------!
+REAL :: plant_mass_sum  ! Sum of plant mass over 1-yr            (g[DM])
 REAL :: rnf_sum         ! Sum of runoff fluxes over 1-yr          (mm/s)
 REAL :: evap_sum        ! Sum of evaporation fluxes over 1-yr     (mm/s)
 !----------------------------------------------------------------------!
@@ -649,6 +650,11 @@ END IF
 !----------------------------------------------------------------------!
 ! Allocate array chunks.
 !----------------------------------------------------------------------!
+! Plant mass       
+!----------------------------------------------------------------------!
+ALLOCATE (plant_mass (nplants_max,lon_c,lat_c)) ! Plant mass     (g[DM])
+ALLOCATE (nplants (lon_c,lat_c)) ! Number plants per grid-box        (-)
+!----------------------------------------------------------------------!
 ALLOCATE (data_in_2DI (lon_c,lat_c))  ! Generic 2D input integer array.
 ALLOCATE (soil_tex    (lon_c,lat_c))  ! HWSD soil textures           (-)
 ALLOCATE (topo_slope  (lon_c,lat_c))  ! Gridcell slope             (deg)
@@ -656,6 +662,7 @@ ALLOCATE (Fmax        (lon_c,lat_c))  ! Max. sat. fraction    (fraction)
 ALLOCATE (lon         (lon_c))        ! Longitudes (degrees east)
 ALLOCATE (lat         (lat_c))        ! Latitudes (degrees north)
 ALLOCATE (block_sub   (lon_c,lat_c))  ! Processor IDs.
+ALLOCATE (axy_plant_mass (lon_c,lat_c,NYR)) ! Mean ann. pl. mass (g[DM])
 ALLOCATE (axy_tas     (lon_c,lat_c,NYR)) ! Mean annual tas           (K)
 ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Mean annual huss      (kg/kg)
 ALLOCATE (axy_ps      (lon_c,lat_c,NYR)) ! Mean annual ps           (Pa)
@@ -727,6 +734,7 @@ ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 ! Initialise global diagnostic arrays with fill (i.e. NaN and zero)
 ! values.
 !----------------------------------------------------------------------!
+axy_plant_mass (:,:,:) = zero / zero
 axy_rnf   (:,:,:) = zero / zero
 axy_evap  (:,:,:) = zero / zero
 axy_tas   (:,:,:) = zero / zero
@@ -1026,6 +1034,7 @@ CALL WRITE_NET_CDF_3DR_soils
 !----------------------------------------------------------------------!
 theta_m    (:,:,:) = zero
 h2osoi_liq (:,:,:) = zero
+plant_mass (:,:,:) = zero
 zwt (:,:) = zero
 wa  (:,:) = zero
 nlayers = nsoil_layers_max
@@ -1055,6 +1064,16 @@ DO y = 1, lat_c
       ! soil from p. 28 of O13 (mm).
       !----------------------------------------------------------------!
       wa (x,y) = 4000.0
+      !----------------------------------------------------------------!
+      ! Initial number of plants in grid-box                         (-)
+      !----------------------------------------------------------------!
+      nplants (x,y) = 1
+      !----------------------------------------------------------------!
+      ! Initial plant masses                                     (g[DM])
+      !----------------------------------------------------------------!
+      DO K = 1, nplants (x,y)
+        plant_mass (K,x,y) = 1.0
+      END DO
       !----------------------------------------------------------------!
     END IF
   END DO
@@ -1244,6 +1263,7 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
           ! Intialise annual diagnostics.
           !------------------------------------------------------------!
+          plant_mass_sum = zero
           rnf_sum  = zero
           evap_sum = zero
           tas_sum  = zero
@@ -1264,6 +1284,8 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             iT = iTIME-time_BOY(syr-1859)+1
             !----------------------------------------------------------!
+
+            !CALL HYDROLOGY
 
             !----------------------------------------------------------!
             ! Precipitation flux (mm s-1).
@@ -2275,6 +2297,12 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
+            DO K = 1, nplants (x,y)
+              plant_mass (K,x,y) = plant_mass (K,x,y) + theta (3)
+            END DO
+            !----------------------------------------------------------!
+
+            !----------------------------------------------------------!
             !IF (INTERACTIVE) THEN
               !WRITE (99,*) iT,theta(1),theta(2),theta(8),prec*dt*48.0
             !END IF
@@ -2288,6 +2316,9 @@ DO iDEC = iDEC_start, iDEC_end
             ps_sum   = ps_sum   + ps   (x,y,iT)
             pr_sum   = pr_sum   + pr   (x,y,iT)
             rhs_sum  = rhs_sum  + rhs  (x,y,iT)
+            DO K = 1, nplants (x,y)
+              plant_mass_sum = plant_mass_sum + plant_mass (K,x,y)
+            END DO
             !----------------------------------------------------------!
             ! Possibly move following to within NS loop.
             !----------------------------------------------------------!
@@ -2311,6 +2342,8 @@ DO iDEC = iDEC_start, iDEC_end
           ! relative to beginning of simulation.
           !------------------------------------------------------------!
           iY = jyear-((iDEC_start-1)*10+1901)+1
+          !------------------------------------------------------------!
+          axy_plant_mass (x,y,iY) = plant_mass_sum / FLOAT (nt)  ! g[DM]
           !------------------------------------------------------------!
           axy_rnf  (x,y,iY) = rnf_sum  / FLOAT (nt * NISURF)      ! mm/s
           axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF)      ! mm/s
@@ -2340,6 +2373,10 @@ IF (INTERACTIVE) THEN
   write (*,*) smp
   write (*,*) 'zq'
   write (*,*) zq
+  write (*,*) 'nplants'
+  write (*,*) nplants
+  write (*,*) 'plant_mass'
+  write (*,*) plant_mass
   !write (*,*) 'lambda'
   !write (*,*) lambda
   !write (*,*) 'bsw'
@@ -2395,6 +2432,8 @@ END DO ! Next decade.
 !----------------------------------------------------------------------!
 ! DEALLOCATE chunk arrays to free up resources.
 !----------------------------------------------------------------------!
+DEALLOCATE (plant_mass)
+DEALLOCATE (nplants)
 DEALLOCATE (data_in_2DI)
 DEALLOCATE (theta_s)
 DEALLOCATE (hksat)
@@ -2411,6 +2450,7 @@ DEALLOCATE (Fmax)
 DEALLOCATE (h2osoi_liq)
 DEALLOCATE (zwt)
 DEALLOCATE (wa)
+DEALLOCATE (axy_plant_mass)
 DEALLOCATE (axy_rnf)
 DEALLOCATE (axy_evap)
 DEALLOCATE (axy_tas)
