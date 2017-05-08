@@ -183,6 +183,7 @@ REAL, ALLOCATABLE :: theta_sum (:)
 ! Miscellaneous variables.
 !----------------------------------------------------------------------!
 REAL :: w_i ! Soil moisture contraint on plant growth                (-)
+REAL :: fT  ! Temperature constraint on plant growth                 (-)
 REAL :: qflx_prec_grnd_rain ! Rain precip. incident on ground     (mm/s)
 REAL :: qflx_top_soil  ! Net water input into soil from top       (mm/s)
 REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
@@ -978,7 +979,7 @@ DEALLOCATE (psi_s_l1)
 !----------------------------------------------------------------------!
 ! Read maximum soil saturated fractions for this block (fraction).
 !----------------------------------------------------------------------!
-file_name = 'Fmax_half.nc'
+file_name = '/scratch/adf10/DATA/SOILS/Fmax_half.nc'
 varid = 1
 !----------------------------------------------------------------------!
 WRITE (*,*) my_id,'Reading from ',TRIM(file_name)
@@ -2299,15 +2300,26 @@ DO iDEC = iDEC_start, iDEC_end
 
             !----------------------------------------------------------!
             ! Grow some plants!
-            ! main file model is /store/MODELS/HXd/SOURCE/RINGS.f90
+            ! N.B. Main radial file model is
+            ! /store/MODELS/HXd/SOURCE/RINGS.f90
             ! -1.5 MPa is equivalant to about -150,000 mm
             !----------------------------------------------------------!
+            ! CESM Eqn. 8.27.
+            w_i = (-150000.0 - smp (1)) / (-150000.0 - (-50000.0))
+            w_i = MAX (zero, w_i)
+            w_i = MIN (one , w_i)
+            ! Temperature affect on growth from Hayat et al. (2017),
+            ! Eqn. 19.
+            IF ((tas (x,y,iT) - tf) > 18.0) THEN
+              fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 21.0) ** 2
+            ELSE
+              fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 25.0) ** 2
+            fT = MAX (zero, fT)
+            fT = MIN (one , fT)
+            END IF
             DO K = 1, nplants (x,y)
-              w_i = (-150000.0 - smp (1)) / (-150000.0 - (-50000.0))
-              w_i = MAX (0.0, w_i)
-              w_i = MIN (1.0, w_i)
               plant_mass (K,x,y) = plant_mass (K,x,y) +  &
-                                   (1500.0 / 365.0) * w_i
+                                   (1500.0 / 365.0) * w_i * fT
             END DO
             !----------------------------------------------------------!
 
@@ -2424,7 +2436,7 @@ DO iDEC = iDEC_start, iDEC_end
 
     !------------------------------------------------------------------!
     WRITE (ydate,'(I4)') jyear
-    file_name = 'axy'//ydate//'.nc'
+    file_name = '/scratch/adf10/HYBRID9/OUTPUT/axy'//ydate//'.nc'
     WRITE (*,*) 'Writing to ',TRIM(file_name)
     !------------------------------------------------------------------!
 
