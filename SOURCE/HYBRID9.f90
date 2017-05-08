@@ -978,7 +978,7 @@ DEALLOCATE (psi_s_l1)
 !----------------------------------------------------------------------!
 ! Read maximum soil saturated fractions for this block (fraction).
 !----------------------------------------------------------------------!
-file_name = 'Fmax_half.nc'
+file_name = '/scratch/adf10/DATA/SOILS/Fmax_half.nc'
 varid = 1
 !----------------------------------------------------------------------!
 WRITE (*,*) my_id,'Reading from ',TRIM(file_name)
