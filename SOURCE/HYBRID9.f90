@@ -182,6 +182,7 @@ REAL, ALLOCATABLE :: theta_sum (:)
 !----------------------------------------------------------------------!
 ! Miscellaneous variables.
 !----------------------------------------------------------------------!
+REAL :: w_i ! Soil moisture contraint on plant growth                (-)
 REAL :: qflx_prec_grnd_rain ! Rain precip. incident on ground     (mm/s)
 REAL :: qflx_top_soil  ! Net water input into soil from top       (mm/s)
 REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
@@ -2297,8 +2298,16 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
+            ! Grow some plants!
+            ! main file model is /store/MODELS/HXd/SOURCE/RINGS.f90
+            ! -1.5 MPa is equivalant to about -150,000 mm
+            !----------------------------------------------------------!
             DO K = 1, nplants (x,y)
-              plant_mass (K,x,y) = plant_mass (K,x,y) + theta (3)
+              w_i = (-150000.0 - smp (1)) / (-150000.0 - (-50000.0))
+              w_i = MAX (0.0, w_i)
+              w_i = MIN (1.0, w_i)
+              plant_mass (K,x,y) = plant_mass (K,x,y) +  &
+                                   (1500.0 / 365.0) * w_i
             END DO
             !----------------------------------------------------------!
 
