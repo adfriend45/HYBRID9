@@ -2306,14 +2306,16 @@ DO iDEC = iDEC_start, iDEC_end
             !----------------------------------------------------------!
             ! CESM Eqn. 8.27.
             w_i = (-150000.0 - smp (1)) / (-150000.0 - (-50000.0))
-            w_i = MAX (0.0, w_i)
-            w_i = MIN (1.0, w_i)
+            w_i = MAX (zero, w_i)
+            w_i = MIN (one , w_i)
             ! Temperature affect on growth from Hayat et al. (2017),
             ! Eqn. 19.
             IF ((tas (x,y,iT) - tf) > 18.0) THEN
               fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 21.0) ** 2
             ELSE
               fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 25.0) ** 2
+            fT = MAX (zero, fT)
+            fT = MIN (one , fT)
             END IF
             DO K = 1, nplants (x,y)
               plant_mass (K,x,y) = plant_mass (K,x,y) +  &
