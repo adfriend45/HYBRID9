@@ -1,9 +1,10 @@
+'/scratch/adf10/HYBRID9/OUTPUT/SX' ! Path for output
 48 ! NISURF     (surface timesteps per day; 48 == 1800 s/dt)
  1 ! iDEC_start ( 1 = 1901-1910)
  1 ! iDEC_end   (11 = 2001-2010; 12 = 2011-2012)
-.F. ! INTERACTIVE
-113.0 ! lon_w
-  2.5 ! lat_w
+.T. ! INTERACTIVE
+0.0 ! lon_w
+52.5 ! lat_w
    1  ! lon_c_w (count towards east)
    1  ! lat_c_w (count towards south)
     0.0 ! zi (0)
