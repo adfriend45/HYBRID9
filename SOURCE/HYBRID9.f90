@@ -47,10 +47,11 @@ REAL :: start(1025),finish(1025)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-CHARACTER (LEN = 200) :: file_in_ts ! Soil input filename.
-CHARACTER (LEN = 200) :: file_in_ks ! Soil input filename.
-CHARACTER (LEN = 200) :: file_in_lm ! Soil input filename.
-CHARACTER (LEN = 200) :: file_in_ps ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_ts  ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_ks  ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_lm  ! Soil input filename.
+CHARACTER (LEN = 200) :: file_in_ps  ! Soil input filename.
+CHARACTER (LEN = 200) :: PATH_output ! Path for axy output files.
 CHARACTER (LEN = 4) :: ydate ! Character value of jyear for file names.
 !----------------------------------------------------------------------!
 
@@ -68,7 +69,7 @@ INTEGER :: iDEC              ! Decade index              (1 = 1901-1910)
 INTEGER :: iDEC_start        ! Index of first decade in simulation   (-)
 INTEGER :: iDEC_end          ! Index of last decade in simulation    (-)
 INTEGER :: jyear             ! Calendar year                        (CE)
-INTEGER :: syr               ! First year in decade                 (CS)
+INTEGER :: syr               ! First year in decade                 (CE)
 INTEGER :: eyr               ! Last year in decade                  (CE)
 INTEGER :: I,J,K             ! Generic loop indices                  (-)
 INTEGER :: NISURF            ! No. timepoints in day                 (-)
@@ -162,6 +163,7 @@ REAL, ALLOCATABLE :: rhs (:,:,:)
 !----------------------------------------------------------------------!
 ! Annual sums for diagnostics.
 !----------------------------------------------------------------------!
+REAL :: npp_sum         ! Sum of NPP over 1-yr            (g[DM]/m^2/yr)
 REAL :: plant_mass_sum  ! Sum of plant mass over 1-yr            (g[DM])
 REAL :: rnf_sum         ! Sum of runoff fluxes over 1-yr          (mm/s)
 REAL :: evap_sum        ! Sum of evaporation fluxes over 1-yr     (mm/s)
@@ -184,6 +186,9 @@ REAL, ALLOCATABLE :: theta_sum (:)
 !----------------------------------------------------------------------!
 REAL :: w_i ! Soil moisture contraint on plant growth                (-)
 REAL :: fT  ! Temperature constraint on plant growth                 (-)
+REAL :: npp                 ! NPP                        (g[DM]/m^2/day)
+REAL :: dplant_mass         ! Plant mass change              (g[DM]/day)
+REAL :: dwater ! Change in soil water for plant growth          (mm/day)
 REAL :: qflx_prec_grnd_rain ! Rain precip. incident on ground     (mm/s)
 REAL :: qflx_top_soil  ! Net water input into soil from top       (mm/s)
 REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
@@ -543,6 +548,7 @@ END IF
 IF (file_free == 1) THEN
   !--------------------------------------------------------------------!
   OPEN (10,FILE='driver.txt',STATUS='OLD')
+  READ (10,*) PATH_output
   READ (10,*) NISURF
   READ (10,*) iDEC_start
   READ (10,*) iDEC_end
@@ -654,7 +660,8 @@ END IF
 !----------------------------------------------------------------------!
 ! Plant mass       
 !----------------------------------------------------------------------!
-ALLOCATE (plant_mass (nplants_max,lon_c,lat_c)) ! Plant mass     (g[DM])
+ALLOCATE (plant_mass   (nplants_max,lon_c,lat_c)) ! Plant mass   (g[DM])
+ALLOCATE (plant_length (nplants_max,lon_c,lat_c)) ! Plant length    (mm)
 ALLOCATE (nplants (lon_c,lat_c)) ! Number plants per grid-box        (-)
 !----------------------------------------------------------------------!
 ALLOCATE (data_in_2DI (lon_c,lat_c))  ! Generic 2D input integer array.
@@ -664,6 +671,7 @@ ALLOCATE (Fmax        (lon_c,lat_c))  ! Max. sat. fraction    (fraction)
 ALLOCATE (lon         (lon_c))        ! Longitudes (degrees east)
 ALLOCATE (lat         (lat_c))        ! Latitudes (degrees north)
 ALLOCATE (block_sub   (lon_c,lat_c))  ! Processor IDs.
+ALLOCATE (axy_npp     (lon_c,lat_c,NYR)) ! Total ann. NPP (g[DM]/m^2/yr)
 ALLOCATE (axy_plant_mass (lon_c,lat_c,NYR)) ! Mean ann. pl. mass (g[DM])
 ALLOCATE (axy_tas     (lon_c,lat_c,NYR)) ! Mean annual tas           (K)
 ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Mean annual huss      (kg/kg)
@@ -736,6 +744,7 @@ ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 ! Initialise global diagnostic arrays with fill (i.e. NaN and zero)
 ! values.
 !----------------------------------------------------------------------!
+axy_npp        (:,:,:) = zero / zero
 axy_plant_mass (:,:,:) = zero / zero
 axy_rnf   (:,:,:) = zero / zero
 axy_evap  (:,:,:) = zero / zero
@@ -1265,6 +1274,7 @@ DO iDEC = iDEC_start, iDEC_end
           !------------------------------------------------------------!
           ! Intialise annual diagnostics.
           !------------------------------------------------------------!
+          npp_sum        = zero
           plant_mass_sum = zero
           rnf_sum  = zero
           evap_sum = zero
@@ -2300,27 +2310,69 @@ DO iDEC = iDEC_start, iDEC_end
 
             !----------------------------------------------------------!
             ! Grow some plants!
+            !----------------------------------------------------------!
             ! N.B. Main radial file model is
             ! /store/MODELS/HXd/SOURCE/RINGS.f90
             ! -1.5 MPa is equivalant to about -150,000 mm
             !----------------------------------------------------------!
             ! CESM Eqn. 8.27.
+            !----------------------------------------------------------!
             w_i = (-150000.0 - smp (1)) / (-150000.0 - (-50000.0))
             w_i = MAX (zero, w_i)
             w_i = MIN (one , w_i)
+            !----------------------------------------------------------!
             ! Temperature affect on growth from Hayat et al. (2017),
             ! Eqn. 19.
+            !----------------------------------------------------------!
             IF ((tas (x,y,iT) - tf) > 18.0) THEN
               fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 21.0) ** 2
             ELSE
               fT = 1.0 - (ABS (tas (x,y,iT) - tf - 18.0) / 25.0) ** 2
-            fT = MAX (zero, fT)
-            fT = MIN (one , fT)
+              fT = MAX (zero, fT)
+              fT = MIN (one , fT)
             END IF
+            !----------------------------------------------------------!
+            npp = 0.0
             DO K = 1, nplants (x,y)
-              plant_mass (K,x,y) = plant_mass (K,x,y) +  &
-                                   (1500.0 / 365.0) * w_i * fT
-            END DO
+              !--------------------------------------------------------!
+              ! Effectively on ground area basis (g[DM]/day)
+              !--------------------------------------------------------!
+              dplant_mass = (3000.0 / 365.0) * (w_i ** 0.5) * &
+                            (fT ** 0.5)
+              npp = npp + dplant_mass
+              !--------------------------------------------------------!
+              ! Growth results in a demand for carbon, which is met by
+              ! photosynthetic machinery capturing light and using this
+              ! energy to reduce CO2 to carbohydrate.
+
+              ! opening stomata at top of stem section, which results in
+              ! demand for water, which is met by pulling water out of
+              ! the soil. Less soil water reduces growth, reducing
+              ! demand, and hence closing stomata. Need store to
+              ! provide communication from growth demand to stomata.
+              ! Stomata may also close to reduce chance of cavitation.
+              ! Hence they respond to VPD and soil water directly.
+              ! N and P also taken up as products of demand
+              ! for them in growth and to fix C.
+              ! Also have sink for reproduction as a priority.
+              ! Objective of growth is to reproduce.
+              !--------------------------------------------------------!
+              ! Simplest: assume WUE of 3 g[DM]/mm, and only root in
+              ! top layer.
+              !--------------------------------------------------------!
+              dwater = MIN (h2osoi_liq (1,x,y), dplant_mass / 3.0)
+              dplant_mass = 3.0 * dwater
+              !--------------------------------------------------------!
+              plant_mass (K,x,y) = plant_mass (K,x,y) + dplant_mass
+              h2osoi_liq (1,x,y) = h2osoi_liq (1,x,y) - dwater
+              !--------------------------------------------------------!
+              ! Assume all is a cylinder of mass with length, and
+              ! with some portion below-ground                      (mm)
+              !--------------------------------------------------------!
+              plant_length (K,x,y) = (400.0 * plant_mass (K,x,y) / &
+                                     3.142E-3) ** (one / 3.0)
+              !--------------------------------------------------------!
+            END DO ! K = 1, nplants (x,y)
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
@@ -2340,6 +2392,7 @@ DO iDEC = iDEC_start, iDEC_end
             DO K = 1, nplants (x,y)
               plant_mass_sum = plant_mass_sum + plant_mass (K,x,y)
             END DO
+            npp_sum = npp_sum + npp
             !----------------------------------------------------------!
             ! Possibly move following to within NS loop.
             !----------------------------------------------------------!
@@ -2350,6 +2403,7 @@ DO iDEC = iDEC_start, iDEC_end
             END DO
             !----------------------------------------------------------!
 
+          !------------------------------------------------------------!
           END DO ! over iTIME points in year.
           !------------------------------------------------------------!
 
@@ -2363,6 +2417,8 @@ DO iDEC = iDEC_start, iDEC_end
           ! relative to beginning of simulation.
           !------------------------------------------------------------!
           iY = jyear-((iDEC_start-1)*10+1901)+1
+          !------------------------------------------------------------!
+          axy_npp (x,y,iY) = npp_sum                      ! g[DM]/m^2/yr
           !------------------------------------------------------------!
           axy_plant_mass (x,y,iY) = plant_mass_sum / FLOAT (nt)  ! g[DM]
           !------------------------------------------------------------!
@@ -2381,10 +2437,10 @@ DO iDEC = iDEC_start, iDEC_end
           ! 
           axy_theta_total (x,y,iY) = h2osoi_sum_total / FLOAT (nt)
           !------------------------------------------------------------!
-        END DO
+        END DO ! jyear = syr, eyr (calendar years in decade)
       END IF ! Soiled grid-box?
-    END DO
-  END DO
+    END DO ! x-loop (lons).
+  END DO ! y-loop (lats).
   !--------------------------------------------------------------------!
 
 IF (INTERACTIVE) THEN
@@ -2398,6 +2454,8 @@ IF (INTERACTIVE) THEN
   write (*,*) nplants
   write (*,*) 'plant_mass'
   write (*,*) plant_mass
+  write (*,*) 'NPP'
+  write (*,*) axy_npp
   !write (*,*) 'lambda'
   !write (*,*) lambda
   !write (*,*) 'bsw'
@@ -2436,7 +2494,8 @@ DO iDEC = iDEC_start, iDEC_end
 
     !------------------------------------------------------------------!
     WRITE (ydate,'(I4)') jyear
-    file_name = '/scratch/adf10/HYBRID9/OUTPUT/axy'//ydate//'.nc'
+    !file_name = '/scratch/adf10/HYBRID9/OUTPUT/axy'//ydate//'.nc'
+    file_name = TRIM(PATH_output)//'/axy'//ydate//'.nc'
     WRITE (*,*) 'Writing to ',TRIM(file_name)
     !------------------------------------------------------------------!
 
@@ -2454,6 +2513,7 @@ END DO ! Next decade.
 ! DEALLOCATE chunk arrays to free up resources.
 !----------------------------------------------------------------------!
 DEALLOCATE (plant_mass)
+DEALLOCATE (plant_length)
 DEALLOCATE (nplants)
 DEALLOCATE (data_in_2DI)
 DEALLOCATE (theta_s)
