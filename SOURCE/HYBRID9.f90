@@ -2358,7 +2358,6 @@ DO iDEC = iDEC_start, iDEC_end
               fT = MAX (zero, fT)
               fT = MIN (one , fT)
             END IF
-write (99,*) fT,w_i
             !----------------------------------------------------------!
             npp = 0.0
             DO K = 1, nplants (x,y)
