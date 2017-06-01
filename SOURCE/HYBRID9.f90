@@ -188,7 +188,16 @@ REAL :: w_i ! Soil moisture contraint on plant growth                (-)
 REAL :: fT  ! Temperature constraint on plant growth                 (-)
 REAL :: npp                 ! NPP                        (g[DM]/m^2/day)
 REAL :: dplant_mass         ! Plant mass change              (g[DM]/day)
+REAL :: dC_labile           ! Plant labile C change           (g[C]/day)
+REAL :: dN_labile           ! Plant labile N change           (g[N]/day)
+REAL :: dP_labile           ! Plant labile P change           (g[P]/day)
 REAL :: dwater ! Change in soil water for plant growth          (mm/day)
+REAL :: C_labile_in    ! C input into plant labile pool       (g[C]/day)
+REAL :: N_labile_in    ! N input into plant labile pool       (g[N]/day)
+REAL :: P_labile_in    ! P input into plant labile pool       (g[P]/day)
+REAL :: C_labile_out   ! C output from plant labile pool      (g[C]/day)
+REAL :: N_labile_out   ! N output from plant labile pool      (g[N]/day)
+REAL :: P_labile_out   ! P output from plant labile pool      (g[P]/day)
 REAL :: qflx_prec_grnd_rain ! Rain precip. incident on ground     (mm/s)
 REAL :: qflx_top_soil  ! Net water input into soil from top       (mm/s)
 REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
@@ -662,6 +671,9 @@ END IF
 !----------------------------------------------------------------------!
 ALLOCATE (plant_mass   (nplants_max,lon_c,lat_c)) ! Plant mass   (g[DM])
 ALLOCATE (plant_length (nplants_max,lon_c,lat_c)) ! Plant length    (mm)
+ALLOCATE (C_labile     (nplants_max,lon_c,lat_c)) ! Labile C      (g[C])
+ALLOCATE (N_labile     (nplants_max,lon_c,lat_c)) ! Labile N      (g[N])
+ALLOCATE (P_labile     (nplants_max,lon_c,lat_c)) ! Labile P      (g[P])
 ALLOCATE (nplants (lon_c,lat_c)) ! Number plants per grid-box        (-)
 !----------------------------------------------------------------------!
 ALLOCATE (data_in_2DI (lon_c,lat_c))  ! Generic 2D input integer array.
@@ -1046,6 +1058,9 @@ CALL WRITE_NET_CDF_3DR_soils
 theta_m    (:,:,:) = zero
 h2osoi_liq (:,:,:) = zero
 plant_mass (:,:,:) = zero
+C_labile   (:,:,:) = zero
+N_labile   (:,:,:) = zero
+P_labile   (:,:,:) = zero
 zwt (:,:) = zero
 wa  (:,:) = zero
 nlayers = nsoil_layers_max
@@ -1080,12 +1095,23 @@ DO y = 1, lat_c
       !----------------------------------------------------------------!
       nplants (x,y) = 1
       !----------------------------------------------------------------!
-      ! Initial plant masses                                     (g[DM])
-      !----------------------------------------------------------------!
       DO K = 1, nplants (x,y)
+        !--------------------------------------------------------------!
+        ! Initial plant masses                                   (g[DM])
+        !--------------------------------------------------------------!
         plant_mass (K,x,y) = 1.0
+        !--------------------------------------------------------------!
+        ! Initial plant labile contents                              (g)
+        ! Values as for leaf in Figure 4 of Bell et al., 2013
+        ! (10.1111/nph.12531), eye-balled means.
+        !--------------------------------------------------------------!
+        C_labile (K,x,y) = plant_mass (K,x,y) * 0.5 * 0.1
+        N_labile (K,x,y) = C_labile (K,x,y) * 0.035 ! N:C = 3.5%
+        P_labile (K,x,y) = N_labile (K,x,y) * 0.025 ! P:N = 2.5%
+        !--------------------------------------------------------------!
       END DO
       !----------------------------------------------------------------!
+      
     END IF
   END DO
 END DO
@@ -2301,6 +2327,7 @@ DO iDEC = iDEC_start, iDEC_end
             ! Diagnostics accumulated within the day.
             !----------------------------------------------------------!
             rnf_sum  = rnf_sum  + qflx_surf
+            rnf_sum = rnf_sum + rsub_top !**********************
             evap_sum = evap_sum + qflx_evap_grnd
             !----------------------------------------------------------!
 
@@ -2321,7 +2348,7 @@ DO iDEC = iDEC_start, iDEC_end
             w_i = MAX (zero, w_i)
             w_i = MIN (one , w_i)
             !----------------------------------------------------------!
-            ! Temperature affect on growth from Hayat et al. (2017),
+            ! Temperature effect on growth from Hayat et al. (2017),
             ! Eqn. 19.
             !----------------------------------------------------------!
             IF ((tas (x,y,iT) - tf) > 18.0) THEN
@@ -2331,6 +2358,7 @@ DO iDEC = iDEC_start, iDEC_end
               fT = MAX (zero, fT)
               fT = MIN (one , fT)
             END IF
+write (99,*) fT,w_i
             !----------------------------------------------------------!
             npp = 0.0
             DO K = 1, nplants (x,y)
@@ -2339,11 +2367,30 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               dplant_mass = (3000.0 / 365.0) * (w_i ** 0.5) * &
                             (fT ** 0.5)
-              npp = npp + dplant_mass
               !--------------------------------------------------------!
               ! Growth results in a demand for carbon, which is met by
               ! photosynthetic machinery capturing light and using this
               ! energy to reduce CO2 to carbohydrate.
+              ! Add a labile carbon pool as a reserve for growth and as
+              ! signal to leaves to grow and photosynthesise.
+              !--------------------------------------------------------!
+              ! So, growth creates a demand for C, N, and P from the
+              ! labile pools, depending on their concentrations in the
+              ! wood. Take these to be fixed for now from:
+              !
+              !--------------------------------------------------------!
+              C_labile_in = 0.0
+              N_labile_in = 0.0
+              P_labile_in = 0.0
+              !--------------------------------------------------------!
+              C_labile_out = 0.47 * dplant_mass
+              N_labile_out = 0.02 * C_labile_out
+              P_labile_out = 0.02 * N_labile_out
+              !--------------------------------------------------------!
+              dC_labile = C_labile_in - C_labile_out
+              dN_labile = N_labile_in - N_labile_out
+              dP_labile = P_labile_in - P_labile_out
+              !--------------------------------------------------------!
 
               ! opening stomata at top of stem section, which results in
               ! demand for water, which is met by pulling water out of
@@ -2371,6 +2418,10 @@ DO iDEC = iDEC_start, iDEC_end
               !--------------------------------------------------------!
               plant_length (K,x,y) = (400.0 * plant_mass (K,x,y) / &
                                      3.142E-3) ** (one / 3.0)
+              !--------------------------------------------------------!
+              ! Sum plant growth to give annual NPP           (g[DM]/yr)
+              !--------------------------------------------------------!
+              npp = npp + dplant_mass
               !--------------------------------------------------------!
             END DO ! K = 1, nplants (x,y)
             !----------------------------------------------------------!
