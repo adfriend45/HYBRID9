@@ -275,13 +275,14 @@ ELSE ! PGF == .F. so assume use LCLIM.
   syr = 2002
   eyr = 2003
   NTIMES = time_BOY (eyr+1-1859) - time_BOY (syr-1859)
+  ALLOCATE (pr  (lon_c,lat_c,NTIMES))
   ALLOCATE (tas (lon_c,lat_c,NTIMES))
   ALLOCATE (huss(lon_c,lat_c,NTIMES))
   ALLOCATE (ps  (lon_c,lat_c,NTIMES))
   ALLOCATE (rhs (lon_c,lat_c,NTIMES))
   ! Open file for daily diagnostics.
   OPEN (20,FILE='LCLIM/daily_diag.csv',STATUS='UNKNOWN')
-  WRITE (20,*) 'DOY,et'
+  WRITE (20,*) 'DOY,et,theta_4'
   !--------------------------------------------------------------------!
 
   !--------------------------------------------------------------------!
@@ -304,7 +305,8 @@ ELSE ! PGF == .F. so assume use LCLIM.
       !----------------------------------------------------------------!
       ! Precipitation flux (mm s-1).
       !----------------------------------------------------------------!
-      prec          = LCLIM_array (2) / sday
+      pr   (x,y,iT) = 10.0 * LCLIM_array (2) / sday
+      prec = 1.0E3 * pr (x,y,iT) / rhow
       tas  (x,y,iT) = LCLIM_array (3) + tf ! K.
       huss (x,y,iT) = LCLIM_array (5)      ! kg/kg.
       ps   (x,y,iT) = LCLIM_array (6)      ! Pa.
@@ -330,7 +332,7 @@ ELSE ! PGF == .F. so assume use LCLIM.
       !----------------------------------------------------------------!
       ! Write daily diagnostics.
       !----------------------------------------------------------------!
-      WRITE (20,*) iT,',',evap_day
+      WRITE (20,*) iT,',',evap_day,',',theta(4)
       !----------------------------------------------------------------!
       ! Integrate biomass over day.
       !----------------------------------------------------------------!
