@@ -1,12 +1,15 @@
-'/scratch/adf10/HYBRID9/OUTPUT/SX' ! Path for output
-48 ! NISURF     (surface timesteps per day; 48 == 1800 s/dt)
- 1 ! iDEC_start ( 1 = 1901-1910)
- 1 ! iDEC_end   (11 = 2001-2010; 12 = 2011-2012)
-.T. ! INTERACTIVE
-0.0 ! lon_w
-52.5 ! lat_w
-   1  ! lon_c_w (count towards east)
-   1  ! lat_c_w (count towards south)
+'/scratch/adf10/HYBRID9/OUTPUT/I' ! Path for output
+48  ! NISURF     (surface timesteps per day; 48 == 1800 s/dt)
+.F. ! Use PGF forcing (PGF)?
+ 1  ! iDEC_start ( 1 = 1901-1910)
+ 1  ! iDEC_end   (11 = 2001-2010; 12 = 2011-2012)
+.T. ! INTERACTIVE (following options only operate if .TRUE.)
+  .T.         ! Local climate (LCLIM)?
+  'LCLIM/climate_US-Var.csv' ! Local climate filename ().
+ 00.0         ! lon_w
+ 52.5         ! lat_w
+   1          ! lon_c_w (count towards east)
+   1          ! lat_c_w (count towards south)
     0.0 ! zi (0)
    45.0
    91.0
@@ -43,7 +46,7 @@
   !lon_w = 0.0
   !lat_w = 20.0
   !--------------------------------------------------------------------!
-  ! Indensian problem point (5 added as well).
+  ! Indonesian problem point (5 added as well).
   lon_w = 137.0
   lat_w = -4.0
   !--------------------------------------------------------------------!

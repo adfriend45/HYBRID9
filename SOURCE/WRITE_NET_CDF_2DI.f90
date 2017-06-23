@@ -10,6 +10,9 @@ SUBROUTINE WRITE_NET_CDF_2DI (data_out)
 USE MPI    ! Enable access to the Message Passing Interface library of
            ! parallel routines.
 USE NETCDF ! Enable access to the library of netCDF routines.
+! Control parameters and variables.
+USE CONTROL, ONLY : file_name,NX,NY,var_name,varid,start_two,lon_s, &
+                    lat_s,count_two,lon_c,lat_c
 USE SHARED ! Shared variables.
 !----------------------------------------------------------------------!
 

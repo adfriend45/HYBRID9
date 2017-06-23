@@ -10,6 +10,9 @@ SUBROUTINE WRITE_NET_CDF_3DR_soils
 USE MPI    ! Enable access to the Message Passing Interface library of
            ! parallel routines.
 USE NETCDF ! Enable access to the library of netCDF routines.
+! Control parameters and variables.
+USE CONTROL, ONLY : file_name,NY,NX,lon_s,lat_s,start_three, &
+                    count_three,lon_c,lat_c,lat_all,lon_all
 USE SHARED ! Shared variables.
 !----------------------------------------------------------------------!
 

@@ -10,6 +10,8 @@ SUBROUTINE READ_NET_CDF_3DR (data_in)
 USE MPI    ! Enable access to the Message Passing Interface library of
            ! parallel routines.
 USE NETCDF ! Enable access to the library of netCDF routines.
+! Control parameters and variables.
+USE CONTROL, ONLY : file_name,varid,lon_s,lat_s,lon_c,lat_c,NTIMES
 USE SHARED ! Shared variables.
 !----------------------------------------------------------------------!
 
