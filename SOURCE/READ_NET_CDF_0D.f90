@@ -7,10 +7,11 @@ SUBROUTINE READ_NET_CDF_0D (datum)
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-USE MPI    ! Enable access to the Message Passing Interface library of
-           ! parallel routines.
-USE NETCDF ! Enable access to the library of netCDF routines.
-USE SHARED ! Shared variables.
+USE MPI     ! Enable access to the Message Passing Interface library of
+            ! parallel routines.
+USE NETCDF  ! Enable access to the library of netCDF routines.
+USE CONTROL, ONLY : file_name ! Control parameters and variables.
+USE SHARED  ! Shared variables.
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -22,7 +23,7 @@ INTEGER, INTENT (OUT) :: datum
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-INTEGER :: ncid ! netCDF ID.
+INTEGER :: ncid
 INTEGER :: len
 CHARACTER (LEN = NF90_MAX_NAME) :: RecordDimName
 !----------------------------------------------------------------------!
