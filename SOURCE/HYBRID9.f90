@@ -19,13 +19,13 @@ PROGRAM H9
 !    -> CombineSnowLayers:  combine snow layers thinner than minimum
 !    -> DivideSnowLayers:   subdivide snow layers thicker than maximum
 !----------------------------------------------------------------------!
-! Uses PGF forcings, 1901-2012.
+! Uses PGF forcings, 1901-2012, or local climate if LCLIM option.
 !----------------------------------------------------------------------!
-! Note yet implemented: energy balance, snow, carbon (vegetation and
-! and soil), optimisation of chunks.
+! Note yet implemented: energy balance, snow, soil C, N, P,carbon,
+! optimisation of chunks, competition.
 !----------------------------------------------------------------------!
 ! Andrew D. Friend
-! 19th June, 2017
+! 17th July, 2017
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -40,8 +40,23 @@ USE SHARED  ! Shared variables.
 IMPLICIT NONE
 !----------------------------------------------------------------------!
 
-INTEGER :: DOY
-REAL, DIMENSION (6) :: LCLIM_array
+!----------------------------------------------------------------------!
+! For spinning up if use local climate.
+!----------------------------------------------------------------------!
+INTEGER :: iLOOP
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Row input of local daily climate.
+!----------------------------------------------------------------------!
+REAL, DIMENSION  (6) :: LCLIM_array
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Row input to local sub-daily climate.
+!----------------------------------------------------------------------!
+REAL, DIMENSION (37) :: LCLIM_array2
+!----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
 ! Annual sums for diagnostics.
@@ -49,6 +64,8 @@ REAL, DIMENSION (6) :: LCLIM_array
 REAL :: npp_sum         ! Sum of NPP over 1-yr            (g[DM]/m^2/yr)
 REAL :: plant_mass_sum  ! Sum of plant mass over 1-yr            (g[DM])
 REAL :: tas_sum         ! Sum of daily tas over 1-yr                 (K)
+REAL :: rlds_sum        ! Sum of daily rlds over 1-yr            (W/m^2)
+REAL :: rsds_sum        ! Sum of daily rsds over 1-yr            (W/m^2)
 REAL :: huss_sum        ! Sum of daily huss over 1-yr            (kg/kg)
 REAL :: ps_sum          ! Sum of daily ps over 1-yr                 (Pa)
 REAL :: pr_sum          ! Sum of daily pr over 1-yr           (kg/m^2/s)
@@ -104,6 +121,7 @@ IF (PGF) THEN
       DO x = 1, lon_c
         IF ((soil_tex (x,y) > 0) .AND. (soil_tex (x,y) /= 13) .AND. &
           SUM (theta_s (:,x,y)) > trunc) THEN
+
           !------------------------------------------------------------!
           nlayers = nsoil_layers_max
           !------------------------------------------------------------!
@@ -118,6 +136,8 @@ IF (PGF) THEN
           rnf_sum  = zero
           evap_sum = zero
           tas_sum  = zero
+          rlds_sum = zero
+          rsds_sum = zero
           huss_sum = zero
           ps_sum   = zero
           pr_sum   = zero
@@ -137,22 +157,56 @@ IF (PGF) THEN
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            ! Precipitation flux (mm s-1).
+            ! Day of year (d).
             !----------------------------------------------------------!
-            prec = 1.0E3 * pr (x,y,iT) / rhow
+            DOY = iTIME - time_BOY (jyear-1859) + 1
             !----------------------------------------------------------!
 
+            !----------------------------------------------------------!
+            ! Set weather variables.
+            !----------------------------------------------------------!
+            tak = tas (x,y,iT) ! Surface air temperature (K)
+            rh = rhs (x,y,iT)  ! Relative humidity (%age)
+            Rnet = 0.92 * rsds (x,y,iT) + rlds (x,y,iT) - &
+                   stbo * tas (x,y,iT) ** 4 !***Rneti really!!!! 
+                   !assumes 8% albedo across short wavelengths.
+            PAR = 0.92 * rsds (x,y,iT) * 2.3
+            ppt = pr (x,y,iT) ! Precipitation flux (kg/m^2/s)
+            !----------------------------------------------------------!
+            ! Precipitation flux (mm s-1).
+            !----------------------------------------------------------!
+            forc_rain = 1.0E3 * pr (x,y,iT) / rhow
+            !----------------------------------------------------------!
+            ! Latent heat of vapourisation of water using Eqn. (4) of
+            ! Pereira da Silva (2012)                             (J/kg)
+            ! Check what CESM does.
+            !----------------------------------------------------------!
+            lamb = ((2503.0 - 2.386 * (tak - tf))) * 1.0E3
+            !----------------------------------------------------------!
+            ! Daily evaporation                                 (mm/day)
+            !----------------------------------------------------------!
+            evap_day = zero
+            evap_grnd_day = zero
             !----------------------------------------------------------!
             ! Loop over timesteps within day (n).
             !----------------------------------------------------------!
             DO NS = 1, NISURF
 
+!*****sub-daily climate needed!!!!? try just using an integration of
+! light energy absorbed...! timestepping here really for hydrology in
+! soil to be stable I think...but transpiration will need it, so do it
+! ?
+
               !--------------------------------------------------------!
               ! Integrate hydrology over timestep.
               !--------------------------------------------------------!
               CALL HYDROLOGY
+              !--------------------------------------------------------!        !--------------------------------------------------------------!
+              ! Accumulate daily evaporation                    (mm/day)
               !--------------------------------------------------------!
-
+              evap_day = evap_day + &
+                         (qflx_evap_grnd + qflx_tran_veg_col) * dt
+              evap_grnd_day = evap_grnd_day + qflx_evap_grnd * dt
             !----------------------------------------------------------!
             END DO ! DO NS = 1, NISURF
             !----------------------------------------------------------!
@@ -164,15 +218,23 @@ IF (PGF) THEN
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
-            !IF (INTERACTIVE) THEN
+            IF (INTERACTIVE) THEN
               !WRITE (99,*) iT,theta(1),theta(2),theta(8),prec*dt*48.0
-            !END IF
+              WRITE (20,'(2(I5,A1),10(F10.4,A1),F10.4)') &
+               jyear,',',DOY,',',&
+               evap_day,',',&
+               evap_grnd_day,',',theta(1),',',theta(2),',',theta(3),&
+               ',',theta(4),',',theta_ma(1),',',LAI,',',LAI_litter,&
+               ',',w_i,',',fT
+            END IF
             !----------------------------------------------------------!
 
             !----------------------------------------------------------!
             ! Diagnostics accumulated over days in year.
             !----------------------------------------------------------!
             tas_sum  = tas_sum  + tas  (x,y,iT) ! K
+            rlds_sum = rlds_sum + rlds (x,y,iT) ! W/m^2
+            rsds_sum = rsds_sum + rsds (x,y,iT) ! W/m^2
             huss_sum = huss_sum + huss (x,y,iT) ! kg/kg
             ps_sum   = ps_sum   + ps   (x,y,iT)
             pr_sum   = pr_sum   + pr   (x,y,iT)
@@ -214,6 +276,8 @@ IF (PGF) THEN
           axy_evap (x,y,iY) = evap_sum / FLOAT (nt * NISURF)      ! mm/s
           !------------------------------------------------------------!
           axy_tas  (x,y,iY) = tas_sum  / FLOAT (nt)                  ! K
+          axy_rlds (x,y,iY) = rlds_sum / FLOAT (nt)              ! W/m^2
+          axy_rsds (x,y,iY) = rsds_sum / FLOAT (nt)              ! W/m^2
           axy_huss (x,y,iY) = huss_sum / FLOAT (nt)              ! kg/kg
           axy_ps   (x,y,iY) = ps_sum   / FLOAT (nt)                 ! Pa
           axy_pr   (x,y,iY) = pr_sum   / FLOAT (nt)           ! kg/m^2/s
@@ -256,6 +320,8 @@ IF (PGF) THEN
     ! Free up resources.
     !------------------------------------------------------------------!
     DEALLOCATE (tas)
+    DEALLOCATE (rlds)
+    DEALLOCATE (rsds)
     DEALLOCATE (huss)
     DEALLOCATE (ps)
     DEALLOCATE (pr)
@@ -266,34 +332,32 @@ IF (PGF) THEN
   END DO ! iDEC = iDEC_start, iDEC_end
   !--------------------------------------------------------------------!
 
+  !--------------------------------------------------------------------!
+  IF (INTERACTIVE) CLOSE (20) ! Daily CSV output.
+  !--------------------------------------------------------------------!
+
 ELSE ! PGF == .F. so assume use LCLIM.
 
-  !--------------------------------------------------------------------!
-  x = 1
-  y = 1
-  nlayers = nsoil_layers_max
-  syr = 2002
-  eyr = 2003
-  NTIMES = time_BOY (eyr+1-1859) - time_BOY (syr-1859)
-  ALLOCATE (pr  (lon_c,lat_c,NTIMES))
-  ALLOCATE (tas (lon_c,lat_c,NTIMES))
-  ALLOCATE (huss(lon_c,lat_c,NTIMES))
-  ALLOCATE (ps  (lon_c,lat_c,NTIMES))
-  ALLOCATE (rhs (lon_c,lat_c,NTIMES))
-  ! Open file for daily diagnostics.
-  OPEN (20,FILE='LCLIM/daily_diag.csv',STATUS='UNKNOWN')
-  WRITE (20,*) 'DOY,et,theta_4'
-  !--------------------------------------------------------------------!
+  DO iLOOP = 1, NYR_SPIN_UP - (eyr - syr + 1) ! Spin-up
 
   !--------------------------------------------------------------------!
   ! Open local climate file.
   !--------------------------------------------------------------------!
-  WRITE (*,*) 'Opening ',LCLIM_filename
+  WRITE (*,*) 'Opening ',TRIM(LCLIM_filename)
   !--------------------------------------------------------------------!
   OPEN (10,FILE=LCLIM_filename,STATUS='OLD')
   !--------------------------------------------------------------------!
+
+  !--------------------------------------------------------------------!
   READ (10,*)
   DO jyear = syr, eyr
+    IF (jyear == 2002) &
+    OPEN (11,FILE='LCLIM/Vaira-grassland-2002-gapfilled-v2015.csv',&
+                   STATUS='OLD')
+    IF (jyear == 2003) &
+    OPEN (11,FILE='LCLIM/Vaira-grassland-2003-gapfilled-v2015.csv',&
+                   STATUS='OLD')
+    READ (11,*)
     DO iTIME = time_BOY (jyear-1859), time_BOY (jyear+1-1859) - 1
 
       !----------------------------------------------------------------!
@@ -301,24 +365,88 @@ ELSE ! PGF == .F. so assume use LCLIM.
       !----------------------------------------------------------------!
 
       !----------------------------------------------------------------!
-      READ (10,*) DOY,LCLIM_array
+      READ (10,*) iDOY,LCLIM_array
+      !----------------------------------------------------------------!
+      evap_obs_day = LCLIM_array (1) / sday ! Read as mm/day.
       !----------------------------------------------------------------!
       ! Precipitation flux (mm s-1).
       !----------------------------------------------------------------!
-      pr   (x,y,iT) = 10.0 * LCLIM_array (2) / sday
-      prec = 1.0E3 * pr (x,y,iT) / rhow
+      pr   (x,y,iT) = LCLIM_array (2) / sday
+      forc_rain = 1.0E3 * pr (x,y,iT) / rhow
       tas  (x,y,iT) = LCLIM_array (3) + tf ! K.
       huss (x,y,iT) = LCLIM_array (5)      ! kg/kg.
       ps   (x,y,iT) = LCLIM_array (6)      ! Pa.
       rhs  (x,y,iT) = LCLIM_array (4)      ! %age.
+      IF (jyear == 2002) THEN
+      IF (iDOY == 1) LAI = 0.88
+      IF (iDOY == 59) LAI = 1.17
+      IF (iDOY == 79) LAI = 1.87
+      IF (iDOY == 94) LAI = 2.23
+      IF (iDOY == 108) LAI = 2.55
+      IF (iDOY == 122) THEN
+        LAI = 1.43
+        LAI_litter = LAI_litter + 2.55 - 1.43
+      END IF
+      IF (iDOY == 136) THEN
+        LAI = 0.001
+        LAI_litter = LAI_litter + 1.43 - 0.001
+      END IF
+      IF (iDOY == 357) LAI = 0.61
+      END IF
+      IF (jyear == 2003) THEN
+        IF (iDOY == 29) LAI = 0.96
+        IF (iDOY == 52) LAI = 1.58
+        IF (iDOY == 76) LAI = 1.82
+        IF (iDOY == 95) LAI = 2.63
+        IF (iDOY == 106) THEN
+          LAI = 2.52
+          LAI_litter = LAI_litter + 2.63 - 2.52
+        END IF
+        IF (iDOY == 120) THEN
+          LAI = 1.86
+          LAI_litter = LAI_litter + 2.52 - 1.86
+        END IF
+        IF (iDOY == 141) THEN
+          LAI = 0.76
+          LAI_litter = LAI_litter + 1.86 - 0.76
+        END IF
+        IF (iDOY == 158) THEN
+          LAI = 0.001
+          LAI_litter = LAI_litter + 0.76 - 0.001
+        END IF
+      END IF
       !----------------------------------------------------------------!
       ! Daily evaporation (mm/day).
       !----------------------------------------------------------------!
-      evap_day = 0.0
+      evap_day = zero
+      evap_grnd_day = zero
       !----------------------------------------------------------------!
       ! Loop over timesteps within day (n).
       !----------------------------------------------------------------!
       DO NS = 1, NISURF
+        !--------------------------------------------------------------!
+        READ (11,*) LCLIM_array2
+        !--------------------------------------------------------------!
+        tak  = LCLIM_array2 (22) + tf
+        rh   = LCLIM_array2 (25)
+        Rnet = LCLIM_array2 (14)
+        PAR  = LCLIM_array2 (16)
+        ppt  = LCLIM_array2 (35) / dt ! mm/s
+        Gs   = LCLIM_array2 (17)
+        !--------------------------------------------------------------!
+        ! Use sub-daily forcings.
+        !--------------------------------------------------------------!
+        forc_rain = ppt
+        !--------------------------------------------------------------!
+        ! Latent heat of vapourisation of water using Eqn. (4) of
+        ! Pereira da Silva (2012)                                 (J/kg)
+        ! Check with what CESM does.
+        !--------------------------------------------------------------!
+        lamb = ((2503.0 - 2.386 * (tak - tf))) * 1.0E3
+        !--------------------------------------------------------------!
+        ! Obs. ET read as W/m^2, convert to mm/s.
+        !--------------------------------------------------------------!
+        evap_obs = (LCLIM_array2 (12) / lamb) * 1.0E3 / rhow
         !--------------------------------------------------------------!
         ! Integrate hydrology over timestep.
         !--------------------------------------------------------------!
@@ -326,26 +454,34 @@ ELSE ! PGF == .F. so assume use LCLIM.
         !--------------------------------------------------------------!
         ! Accumulate daily evaporation                          (mm/day)
         !--------------------------------------------------------------!
-        evap_day = evap_day + qflx_evap * dt
+        evap_day = evap_day + (qflx_evap_grnd + qflx_tran_veg_col) * dt
+        evap_grnd_day = evap_grnd_day + qflx_evap_grnd * dt
         !--------------------------------------------------------------!
       END DO ! DO NS = 1, NISURF
       !----------------------------------------------------------------!
       ! Write daily diagnostics.
       !----------------------------------------------------------------!
-      WRITE (20,*) iT,',',evap_day,',',theta(4)
+              WRITE (20,'(2(I5,A1),10(F10.4,A1),F10.4)') &
+               jyear,',',DOY,',',&
+               evap_day,',',&
+               evap_grnd_day,',',theta(1),',',theta(2),',',theta(3),&
+               ',',theta(4),',',theta_ma(1),',',LAI,',',LAI_litter,&
+               ',',w_i,',',fT
       !----------------------------------------------------------------!
       ! Integrate biomass over day.
       !----------------------------------------------------------------!
+!***** also in HYDROLOGY now
+!      LAI_litter = 0.99 * LAI_litter ! mostly gone in 1-yr.
       !CALL GROW
       !----------------------------------------------------------------!
 
     END DO
+    CLOSE (11)
   END DO
+  CLOSE (10)
   !--------------------------------------------------------------------!
-  CLOSE (10) ! Close file of local climate forcing.
-  CLOSE (20) ! Close file for daily diagnostics.
-  !--------------------------------------------------------------------!
-
+end do
+CLOSE (20)
   !--------------------------------------------------------------------!
 END IF ! PGF?
 !----------------------------------------------------------------------!
@@ -409,6 +545,8 @@ DEALLOCATE (axy_plant_mass)
 DEALLOCATE (axy_rnf)
 DEALLOCATE (axy_evap)
 DEALLOCATE (axy_tas)
+DEALLOCATE (axy_rlds)
+DEALLOCATE (axy_rsds)
 DEALLOCATE (axy_huss)
 DEALLOCATE (axy_ps)
 DEALLOCATE (axy_pr)
@@ -418,6 +556,15 @@ DEALLOCATE (axy_theta)
 
 !----------------------------------------------------------------------!
 CALL MPI_FINALIZE (ierr)
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+IF (.NOT. (PGF)) THEN
+  !--------------------------------------------------------------------!
+  !CLOSE (10) ! Close file of local climate forcing.
+  CLOSE (20) ! Close file for daily diagnostics.
+  !--------------------------------------------------------------------!
+END IF
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
