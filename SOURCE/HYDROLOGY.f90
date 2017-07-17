@@ -7,7 +7,6 @@ SUBROUTINE HYDROLOGY
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-!USE NETCDF  ! Enable access to the library of netCDF routines.
 USE CONTROl ! Control variables.
 USE SHARED  ! Shared variables.
 !----------------------------------------------------------------------!
@@ -27,40 +26,56 @@ REAL :: fsat        ! Fractional area with water table at surface    (-)
 REAL :: fcov        ! Fractional impermable area                     (-)
 REAL :: qflx_surf   ! Surface runoff                              (mm/s)
 REAL :: frac_h2osfc ! Fraction of ground covered by surface water    (-)
+REAL :: Rcan
+REAL :: beta_save
+REAL :: PMc         ! Closed canopy evaporation                  (W/m^2)
+REAL :: PMs         ! Bare substrate evaporation                 (W/m^2)
+REAL :: desatdT     ! Rate of change of esat with T           (kg/m^3/K)
+REAL :: G           ! Soil heat flux                             (W/m^2)
+REAL, PARAMETER :: cp = 1010.0       ! Specific heat of dry air (J/kg/K)
+REAL :: VDD         ! Water vapour density deficit              (kg/m^3)
+REAL :: VDDs
+REAL :: rh_soil
+REAL :: gamma       ! Psychrometric parameter                 (kg/m^3/K)
+REAL :: rac         ! Bulk boundary layer resistance in canopy     (s/m)
+REAL :: Rnets       ! Net radiative flux into substrante         (W/m^2)
+REAL :: raa         ! Canopy to air aerodynamic resistance         (s/m)
+REAL :: rsc         ! Bulk stomatal resistance of the canopy       (s/m)
+REAL :: ras         ! Substrate to canopy aerodynamic resistance   (s/m)
+REAL :: rss         ! Surface resistance of the substrate          (s/m)
+REAL :: Cc          ! Fraction of PMc to total evaporation           (-)
+REAL :: Cs          ! Fraction of PMs to total evaporation           (-)
+REAL :: Ra,Rs,Rc    ! Coefficients for Cc and Cs                     (?)
+REAL :: LE
+REAL :: VDD0
+REAL :: LEs
+REAL :: LEc
+REAL :: LEw
+REAL :: decay
+REAL :: dchi
+REAL :: dsmpdchi
 !----------------------------------------------------------------------!
 ! Soil moisture constraint on evaporative flux                (fraction)
 !----------------------------------------------------------------------!
 REAL :: beta
 !----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
 ! Virtual potential surface temperature                              (K)
 !----------------------------------------------------------------------!
 REAL :: tsv
-!----------------------------------------------------------------------!
 !----------------------------------------------------------------------!
 ! Air density                                                (kg[a]/m^3)
 !----------------------------------------------------------------------!
 REAL :: rho
 !----------------------------------------------------------------------!
-! Ratio of air to water density                            (kg[a]/kg[w])
-!----------------------------------------------------------------------!
-REAL :: rho3
-!----------------------------------------------------------------------!
-! Specific humidity of ground                              (kg[w]/kg[a])
-!----------------------------------------------------------------------!
-REAL :: qb
-!----------------------------------------------------------------------!
 ! Saturation water vapour mixing ratio                     (kg[w]/kg[a])
 !----------------------------------------------------------------------!
 REAL :: QSAT
 !----------------------------------------------------------------------!
-! Conductance of the atmosphere                                   (mm/s)
-!----------------------------------------------------------------------!
-REAL :: cna
-!----------------------------------------------------------------------!
 ! Water available for evaporation over timestep                   (mm/s)
 !----------------------------------------------------------------------!
-REAL :: evap_max
-REAL :: qflx_evap_grnd ! Ground surface evaporation rate          (mm/s)
+REAL :: evap_max (nsoil_layers_max)
 REAL :: qflx_ev_h2osfc ! Evaporative flux from h2osfc             (mm/s)
 REAL :: qflx_in_soil   ! Surface input to soil                    (mm/s)
 REAL :: qflx_in_h2osfc ! Surface input to h2osfc                  (mm/s)
@@ -118,38 +133,39 @@ REAL :: available_h2osoi_liq ! Available soil liq. water in a layer (mm)
 ! Minimum soil moisture                                             (mm)
 !----------------------------------------------------------------------!
 REAL, PARAMETER :: watmin = 0.01
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Initial total soil water for INTERACTIVE diagnostics (mm).
-            ! Also compute volumetric water (mm^3/mm^3).
-            !----------------------------------------------------------!
-            w0 = prec * dt + wa (x,y)
-
-            DO I = 1, nlayers
-              !--------------------------------------------------------!
-              w0 = w0 + h2osoi_liq (I,x,y)
-              !--------------------------------------------------------!
-              theta (I) = h2osoi_liq (I,x,y) / (dz (I) * rhow / 1000.0)
-              !--------------------------------------------------------!
-            END DO
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Initial total soil water for diagnostics                          (mm)
+!----------------------------------------------------------------------!
+w0 = forc_rain * dt + wa (x,y)
+DO I = 1, nlayers
+  !--------------------------------------------------------------------!
+  w0 = w0 + h2osoi_liq (I,x,y)
+  !--------------------------------------------------------------------!
+  ! Also compute volumetric water                            (mm^3/mm^3)
+  !--------------------------------------------------------------------!
+  theta    (I) = h2osoi_liq    (I,x,y) / (dz (I) * rhow / 1.0E3)
+  theta_ma (I) = h2osoi_liq_ma (I,x,y) / (dz (I) * rhow / 1.0E3)
+  !--------------------------------------------------------------------!
+END DO
+!----------------------------------------------------------------------!
 
 !**********************************************************************!
 ! Start of CESM 'SLakeHydrology'.
 !**********************************************************************!
 
-            !----------------------------------------------------------!
-            ! Precipitation onto ground, assuming constant during
-            ! day. Need to test if pulses changes results         (mm/s)
-            !----------------------------------------------------------!
-            qflx_prec_grnd_rain = prec
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Rain precipitation incident on ground                           (mm/s)
+!----------------------------------------------------------------------!
+qflx_prec_grnd_rain = forc_rain
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Net water input into soil from top                  (mm/s)
-            !----------------------------------------------------------!
-            qflx_top_soil = qflx_prec_grnd_rain
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Net water input into soil from top                              (mm/s)
+!----------------------------------------------------------------------!
+qflx_top_soil = qflx_prec_grnd_rain
+!----------------------------------------------------------------------!
 
 !**********************************************************************!
 ! End of CESM 'SLakeHydrology'.
@@ -159,174 +175,308 @@ REAL, PARAMETER :: watmin = 0.01
 ! Start of CESM 'SurfaceRunoff'.
 !**********************************************************************!
 
-            !----------------------------------------------------------!
-            ! Decay factor                                           (m)
-            ! In CESM set using line in 'iniTimeConst.F90'.
-            !----------------------------------------------------------!
-            hkdepth = 1.0 / 2.5
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Decay factor for water table                                       (m)
+! In CESM set using line in 'iniTimeConst.F90'.
+!----------------------------------------------------------------------!
+hkdepth = one / 2.5
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Decay factor                                          (/m)
-            !----------------------------------------------------------!
-            fff = 1.0 / hkdepth
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Decay factor for water table                                      (/m)
+!----------------------------------------------------------------------!
+fff = 1.0 / hkdepth
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Max. saturation fraction for grid cell                 (-)
-            !----------------------------------------------------------!
-            wtfact = Fmax (x,y)
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Max. saturation fraction for grid cell                             (-)
+!----------------------------------------------------------------------!
+wtfact = Fmax (x,y)
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Fractional area with water table at surface            (-)
-            !----------------------------------------------------------!
-            fsat = wtfact * EXP (-0.5 * fff * zwt (x,y))
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Fractional area with water table at surface                        (-)
+!----------------------------------------------------------------------!
+fsat = wtfact * EXP (-0.5 * fff * zwt (x,y))
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Fractional impermable area                             (-)
-            !----------------------------------------------------------!
-            fcov = fsat
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Fractional impermable area                                         (-)
+!----------------------------------------------------------------------!
+fcov = fsat
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Surface runoff                                      (mm/s)
-            !----------------------------------------------------------!
-            qflx_surf = fcov * qflx_top_soil
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Surface runoff                                                  (mm/s)
+!----------------------------------------------------------------------!
+qflx_surf = fcov * qflx_top_soil
+!----------------------------------------------------------------------!
 
 !**********************************************************************!
 ! End of CESM 'SurfaceRunoff'.
 !**********************************************************************!
 
-            !----------------------------------------------------------!
-            ! Fraction of ground covered by surface water
-            ! (full treatment is in H2OSfcMod.F90: do later) (-).
-            ! Set to zero for now.
-            !----------------------------------------------------------!
-            !frac_h2osfc = fsat
-            frac_h2osfc = zero !***************!
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Fraction of ground covered by surface water
+! (full treatment is in H2OSfcMod.F90: do later)                     (-)
+! Set to zero for now.
+!----------------------------------------------------------------------!
+frac_h2osfc = zero
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Soil moisture constraint on evaporative flux (0-1).
-            !----------------------------------------------------------!
-            beta = zero
-            DO I = 1, 1
-              IF (theta_s (I,x,y) > trunc) THEN
-                beta = MAX (MIN (one, theta (I) / theta_s (I,x,y)), &
-                            beta)
-              ELSE
-                beta = MAX (zero, beta)
-              END IF
-            END DO
-            !----------------------------------------------------------!
-            ! Virtual potential surface temperature                 (K).
-            ! Correct temperature to use for rho?
-            ! deltx is coeff. of humidity in virtual temperature.
-            !----------------------------------------------------------!
-            tsv = tas (x,y,iT) * (one + huss (x,y,iT) * deltx)
-            !----------------------------------------------------------!
-            ! Air density                                   (kg[a] m-3).
-            !----------------------------------------------------------!
-            rho = ps (x,y,iT) / (rgas * tsv)
-            !----------------------------------------------------------!
-            ! Ratio of air to water density             (kg[a] kg[w]-1).
-            !----------------------------------------------------------!
-            rho3 = rho / rhow
-            !----------------------------------------------------------!
-            ! Specific humidity of ground               (kg[w] kg[a]-1).
-            !----------------------------------------------------------!
-            qb = QSAT (tas (x,y,iT), lhe, ps (x,y,iT) / 100.0)
-            !----------------------------------------------------------!
-            ! Conductance of the atmosphere (mm s-1). Hack for now.
-            !----------------------------------------------------------!
-            cna = 0.02E3
-            !----------------------------------------------------------!
-            ! Water available for evaporation over timestep (mm s-1).
-            !----------------------------------------------------------!
-            evap_max = zero
-            DO I = 1, 1
-              evap_max = evap_max + dz (I) * &
-                         (theta (I) - theta_m (I,x,y)) / dt
-            END DO
-            !----------------------------------------------------------!
-            ! Ground surface evaporation rate (mm s-1).
-            !----------------------------------------------------------!
-            huss (x,y,iT) = qb * rhs (x,y,iT) / 100.0
-            qflx_evap_grnd = beta * rho3 * cna * &
-                          (qb - qb * rhs (x,y,iT) / 100.0)
-            qflx_evap_grnd = MAX (zero, qflx_evap_grnd)
-            qflx_evap_grnd = MIN (evap_max,qflx_evap_grnd)
-            !----------------------------------------------------------!
-            ! Evaporative flux from h2osfc (mm/s).
-            !----------------------------------------------------------!
-            qflx_ev_h2osfc = rho3 * cna * &
-                          (qb - qb * rhs (x,y,iT) / 100.0)
-            qflx_ev_h2osfc = MAX (zero, qflx_ev_h2osfc)
-            qflx_ev_h2osfc = MIN (evap_max,qflx_ev_h2osfc)
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Virtual potential surface temperature                              (K)
+! Correct temperature to use for rho?
+! deltx is coeff. of humidity in virtual temperature.
+!----------------------------------------------------------------------!
+tsv = tak * (one + huss (x,y,iT) * deltx)
+!----------------------------------------------------------------------!
+! Air density                                                (kg[a] m-3)
+!----------------------------------------------------------------------!
+rho = ps (x,y,iT) / (rgas * tsv)
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Mean rate of change of saturated vapour pressure with temperature
+! ('s' of 'Delata' in classic Penman-Monteith equations)      (kg/m^3/K)
+! Equation based on  http://www.fao.org/docrep/X0490E/x0490e07.htm
+!----------------------------------------------------------------------!
+desatdT = (4098.0 * (0.6108 * EXP ((17.27 * (tak - tf)) / &
+          (tak - tf + 237.3)))) / &
+          ((tak - tf + 237.3) ** 2)
+desatDt = desatDt * 18.0 / (gasc * tak)
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Saturation vapour density                                     (kg/m^3)
+! Eqn from www.fao.org/docrep/X0490E/x0490e07.htm
+!----------------------------------------------------------------------!
+esat = 0.6108 * EXP (17.27 * (tak - tf) / (tak - tf + 237.3))
+esat = esat * 18.0 / (gasc * tak)
+!----------------------------------------------------------------------!
+! Water vapour density deficit                                  (kg/m^3)
+!----------------------------------------------------------------------!
+VDD = esat * (one - rh / 100.0)
+!----------------------------------------------------------------------!
+! Psychrometric parameter                                     (kg/m^3/K)
+!----------------------------------------------------------------------!
+gamma =  (cp * ps (x,y,iT)/ (lamb * 0.622)) * (18.0E-3 / (gasc * tak))
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Moisture control on stomatal conductance of canopy                 (-)
+!----------------------------------------------------------------------!
+beta_save = zero
+DO I = 1, nlayers
+  beta = one - (smp (I) - zc (I)) / (-150000.0)
+  beta = MIN (one, beta)
+  beta = MAX (zero, beta)
+  beta_save = beta_save + rootr_col (I,x,y) * beta
+END DO
+beta = beta_save
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Bulk stomatal resistance of the canopy.
+! LAI dependence from Shuttleworth Eqn. (20)                       (s/m)
+!----------------------------------------------------------------------!
+IF ((LAI (x,y) > zero) .AND. (beta > zero) .AND. (PAR > zero)) &
+  THEN
+  rsc = (1.0 / (PAR / (PAR + 300.0))) * 400.0 / &
+        (2.0 * LAI (x,y) * beta * &
+        (2.8 ** (-80.0 * MAX (zero, VDD) / rho)))
+ELSE
+  rsc = 1.0E6
+END IF
+!----------------------------------------------------------------------!
+! Minimum resistance based on Baldocchi et al. (2004). Is about
+! 113 s/m for full leaf area at 0.6 mol/m^s/s.
+!----------------------------------------------------------------------!
+rsc = MAX (rsc,1.0/((LAI (x,y)/2.7)*0.9/(rho*1.0E3/18.0)))
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Bulk boundary layer resistance of the vegetative elements
+! in the canopy. Eqn. (20) of SW85                                 (s/m)
+!----------------------------------------------------------------------!
+IF (LAI (x,y) > zero) THEN
+  rac = 25.0 / (2.0 * LAI (x,y))
+ELSE
+  rac = 1.0E6
+END IF
+!----------------------------------------------------------------------!
+! Aerodynamic resistances between canopy source height and
+! reference level, and between the substrate and canopy source height;
+! Eqns. (30;31) SW85                                               (s/m)
+!----------------------------------------------------------------------!
+IF (LAI (x,y) <= 4.0) THEN
+  raa = 0.25 * LAI (x,y) *  42.0 + 0.25 * (4.0 - LAI (x,y)) * 34.0
+  ras = 0.25 * LAI (x,y) * 128.0 + 0.25 * (4.0 - LAI (x,y)) * 49.0
+ELSE
+  raa =  42.0
+  ras = 128.0
+END IF
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Surface resistance of the substrate                              (s/m)
+! Uses Eqn. (20) of van de Griend & Owe (1994).
+!----------------------------------------------------------------------!
+IF (theta (1) <= 0.15) THEN
+  rss = (10.0 + 1000.0 * LAI_litter (x,y)) * &
+        EXP (0.3563 * 100.0 * (0.15 - theta (1)))
+ELSE
+  rss = (10.0 + 1000.0 * LAI_litter (x,y) * &
+        (1.0 - theta(1)/theta_s(1,x,y)))
+END IF
+!----------------------------------------------------------------------!
+! Net radiation into the substrate (Eqn. 21 SW85)                (W/m^2)
+!----------------------------------------------------------------------!
+Rnets = Rnet * EXP (-0.7 * LAI (x,y))
+!----------------------------------------------------------------------!
+! Soil heat flux                                                 (W/m^2)
+!----------------------------------------------------------------------!
+G = 0.2 * Rnets
+!----------------------------------------------------------------------!
+! Separate Penman-Monteith evaporation between canopy and
+! substrate (Eqn. 12 SW85)                                       (W/m^2)
+!----------------------------------------------------------------------!
+PMc = (desatdT * (Rnet - G) + (rho * cp * VDD - &
+      desatdT * rac * (Rnets - G)) / (raa + rac)) / &
+      (desatdT + gamma * (one + rsc / (raa + rac)))
+!----------------------------------------------------------------------!
+! Penman-Monteith bare substrate evaporation (Eqn. 13 SW85)      (W/m^2)
+!----------------------------------------------------------------------!
+PMs = (desatdT * (Rnet - G) + (rho * cp * VDD - &
+      desatdT * ras * (Rnet - Rnets)) / (raa + ras)) / &
+      (desatdT + gamma * (one + rss / (raa + ras)))
+!----------------------------------------------------------------------!
+! Coefficients for Cc and Cr                                       (s/m)
+!----------------------------------------------------------------------!
+Ra = (desatdT + gamma) * raa
+Rs = (desatdT + gamma) * ras + gamma * rss
+Rc = (desatdT + gamma) * rac + gamma * rsc
+!----------------------------------------------------------------------!
+! Fraction of PMc to total evaporation                               (-)
+!----------------------------------------------------------------------!
+Cc = one / (one + Rc * Ra / (Rs * (Rc + Ra)))
+!----------------------------------------------------------------------!
+! Fraction of PMs to total evaporation                               (-)
+!----------------------------------------------------------------------!
+Cs = one / (one + Rs * Ra / (Rc * (Rs + Ra)))
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Total latent heat flux                                         (W/m^2)
+!----------------------------------------------------------------------!
+LE = Cc * PMc + Cs * PMs
+!----------------------------------------------------------------------!
+! Implied vapour density deficit at the canopy source height    (kg/m^3)
+!----------------------------------------------------------------------!
+VDD0 = VDD + (desatdT * (Rnet - G) - (desatdT + gamma) * LE) * &
+       raa / (rho * cp)
+!----------------------------------------------------------------------!
+! Implied latent heat fluxes from canopy and substrate           (W/m^2)
+!----------------------------------------------------------------------!
+LEc = (desatdT * (Rnet - Rnets) + rho * cp * VDD0 / rac) / &
+      (desatdT + gamma * (1.0 + rsc / rac))
+LEs = (desatdT * (Rnets - G) + rho * cp * VDD0 / ras) / &
+      (desatdT + gamma * (1.0 + rss / ras))
+!----------------------------------------------------------------------!
+! Convert from W/m^2 to mm/s.
+!----------------------------------------------------------------------!
+qflx_tran_veg_col = LEc * 1.0E3 / (rhow * lamb)
+qflx_evap_grnd    = LEs * 1.0E3 / (rhow * lamb)
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Limit substrate evaporation to available water in surface layer
+! minus canopy transpiration from surface layer  (mm/s)
+!----------------------------------------------------------------------!
+evap_max (:)= zero
+evap_max (1) = dz (1) * (theta (1) - watmin) / dt - &
+               qflx_tran_veg_col * rootr_col (1,x,y)
+evap_max (1) = MAX (zero, evap_max (1))
+qflx_evap_grnd = MIN (evap_max (1), qflx_evap_grnd)
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Limit transpiration from each layer to available water in layer (mm/s)
+! Fix up...............****************
+!----------------------------------------------------------------------!
+DO I = 1, nlayers
+  evap_max (I) = dz (I) * (theta (I) - watmin) / dt
+END DO
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Evaporation rate from open water (mm/s). Not used yet.
+!----------------------------------------------------------------------!
+LEw = (desatdT * (Rnet - Rnets) + rho * cp * VDD0 / rac) &
+      / (desatdT + gamma * (one + zero / rac))
+qflx_ev_h2osfc = LEw * 1.0E3 / (rhow * lamb)
+qflx_ev_h2osfc = zero !****
+!----------------------------------------------------------------------!
+
 !**********************************************************************!
 ! Start of CESM 'Infiltration'.
 !**********************************************************************!
 
-            !----------------------------------------------------------!
-            DO I = 1, nlayers
-              ! Porosity of soil.
-              eff_porosity (I) = MAX (0.01, theta_s(I,x,y))
-            END DO
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+DO I = 1, nlayers
+  !--------------------------------------------------------------------!
+  ! Porosity of soil.
+  !--------------------------------------------------------------------!
+  eff_porosity (I) = MAX (0.01, theta_s(I,x,y))
+  !--------------------------------------------------------------------!
+END DO
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Local evaporation                                   (mm/s)
-            !----------------------------------------------------------!
-            qflx_evap = qflx_evap_grnd
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Local evaporation                                               (mm/s)
+!----------------------------------------------------------------------!
+qflx_evap = qflx_evap_grnd
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Partition surface inputs between soil and h2osfc    (mm/s)
-            !----------------------------------------------------------!
-            qflx_in_soil = (one - frac_h2osfc) * &
-                           (qflx_top_soil - qflx_surf)
-            qflx_in_h2osfc = frac_h2osfc * (qflx_top_soil - qflx_surf)
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Partition surface inputs between soil and h2osfc                (mm/s)
+!----------------------------------------------------------------------!
+qflx_in_soil = (one - frac_h2osfc) * (qflx_top_soil - qflx_surf)
+qflx_in_h2osfc = frac_h2osfc * (qflx_top_soil - qflx_surf)
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Remove evaporation                                  (mm/s)
-            !----------------------------------------------------------!
-            qflx_in_soil = qflx_in_soil - &
-                           (one - frac_h2osfc) * qflx_evap
-            qflx_in_h2osfc = qflx_in_h2osfc - &
-                             frac_h2osfc * qflx_ev_h2osfc
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Remove evaporation                                              (mm/s)
+!----------------------------------------------------------------------!
+qflx_in_soil = qflx_in_soil - (one - frac_h2osfc) * qflx_evap
+qflx_in_h2osfc = qflx_in_h2osfc - frac_h2osfc * qflx_ev_h2osfc
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Maximum infiltration capacity                       (mm/s)
-            !----------------------------------------------------------!
-            qinmax = (one - fsat) * MINVAL (hksat (1:3,x,y))
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Maximum infiltration capacity                                   (mm/s)
+!----------------------------------------------------------------------!
+qinmax = (one - fsat) * MINVAL (hksat (1:3,x,y))
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Infiltration excess runoff -> h2osfc                (mm/s)
-            !----------------------------------------------------------!
-            qflx_infl_excess = MAX (0.0, qflx_in_soil - &
-                               (1.0 - frac_h2osfc) * qinmax)
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Infiltration excess runoff -> h2osfc                            (mm/s)
+!----------------------------------------------------------------------!
+qflx_infl_excess = MAX (zero, qflx_in_soil - &
+                   (one - frac_h2osfc) * qinmax)
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Soil infiltration                                   (mm/s)
-            !----------------------------------------------------------!
-            qflx_infl = qflx_in_soil - qflx_infl_excess
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Soil infiltration                                               (mm/s)
+!----------------------------------------------------------------------!
+qflx_infl = qflx_in_soil - qflx_infl_excess
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Shift infiltration excess from h2osfc input to surface
-            ! runoff                                              (mm/s)
-            !----------------------------------------------------------!
-            qflx_surf = qflx_surf + qflx_infl_excess
-            qflx_infl_excess = zero
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Shift infiltration excess from h2osfc input to surface runoff   (mm/s)
+!----------------------------------------------------------------------!
+qflx_surf = qflx_surf + qflx_infl_excess
+qflx_infl_excess = zero
+!----------------------------------------------------------------------!
 
 !**********************************************************************!
 ! End of CESM 'Infiltration'.
@@ -336,29 +486,28 @@ REAL, PARAMETER :: watmin = 0.01
 ! Start of CESM 'SoilWater'.
 !**********************************************************************!
 
-            !----------------------------------------------------------!
-            ! Water table depth                                     (mm)
-            !----------------------------------------------------------!
-            zwtmm = 1000.0 * zwt (x,y)
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Water table depth                                                 (mm)
+!----------------------------------------------------------------------!
+zwtmm = 1000.0 * zwt (x,y)
+!----------------------------------------------------------------------!
 
-            !----------------------------------------------------------!
-            ! Compute jwt index, the index of the first unsaturated
-            ! layer, i.e. the layer right above the water table (-).
-            !----------------------------------------------------------!
-            jwt = nlayers
-            !----------------------------------------------------------!
-            ! Allow jwt to equal zero when zwt is in top layer.
-            !----------------------------------------------------------!
-            DO I = 1, nlayers
-              IF (zwt (x,y) <= (zi (I) / 1000.0)) THEN
-                jwt = I - 1
-                EXIT
-              END IF
-            END DO
-            IF (INTERACTIVE) &
-              write (98,*) 'water table',iTIME,zwt(x,y),jwt
-            !----------------------------------------------------------!
+!----------------------------------------------------------------------!
+! Compute jwt index, the index of the first unsaturated
+! layer, i.e. the layer right above the water table (-).
+!----------------------------------------------------------------------!
+jwt = nlayers
+!----------------------------------------------------------------------!
+! Allow jwt to equal zero when zwt is in top layer.
+!----------------------------------------------------------------------!
+DO I = 1, nlayers
+ IF (zwt (x,y) <= (zi (I) / 1000.0)) THEN
+    jwt = I - 1
+    EXIT
+  END IF
+END DO
+IF (INTERACTIVE) write (98,*) 'water table',iTIME,zwt(x,y),jwt
+!----------------------------------------------------------------------!
 
             !----------------------------------------------------------!
             ! Calculate the equilibrium water content based on the water
@@ -519,8 +668,9 @@ REAL, PARAMETER :: watmin = 0.01
                          den                   ! -7.119
             dqodw2 (I) = -( hk (I) * dsmpdw (I+1) + num * dhkdw (I)) / &
                          den                   ! -7.120
-            rmx (I) = qin (I) - qout (I)
-            amx (I) = 0.0                      !  7.136
+            rmx (I) = qin (I) - qout (I) - qflx_tran_veg_col * &
+                      rootr_col (I,x,y)
+            amx (I) = zero                     !  7.136
             bmx (I) = dz (I) / dt + dqodw1 (I) ! -7.137
             cmx (I) = dqodw2 (I)               ! -7.138
             !----------------------------------------------------------!
@@ -544,7 +694,8 @@ REAL, PARAMETER :: watmin = 0.01
                            num * dhkdw (I)) / den             ! 
               dqodw2 (I) = -( hk (I) * dsmpdw (I+1) + &
                            num * dhkdw (I)) / den
-              rmx (I) = qin (I) - qout (I)
+              rmx (I) = qin (I) - qout (I) - qflx_tran_veg_col * &
+                        rootr_col (I,x,y)
               amx (I) = -dqidw0 (I)                           ! -7.140
               bmx (I) = dz (I) / dt - dqidw1 (I) + dqodw1 (I) ! -7.141
               cmx (I) = dqodw2 (I)
@@ -570,7 +721,8 @@ REAL, PARAMETER :: watmin = 0.01
                            num * dhkdw (I-1)) / den
               qout   (I) = zero
               dqodw1 (I) = zero
-              rmx (I) =  qin (I) - qout (I)
+              rmx (I) =  qin (I) - qout (I) - qflx_tran_veg_col * &
+                         rootr_col (I,x,y)
               amx (I) = -dqidw0 (I)
               bmx (I) =  dz (I) / dt - dqidw1 (I) + dqodw1 (I)
               cmx (I) =  zero
@@ -602,9 +754,9 @@ REAL, PARAMETER :: watmin = 0.01
               !--------------------------------------------------------!
               ! First set up bottom layer of soil column.
               !--------------------------------------------------------!
-              den   = zc  (I) - zc  (I-1)
+              den = zc  (I) - zc  (I-1)
               dzq = zq  (I) - zq  (I-1)
-              num   = smp (I) - smp (I-1) - dzq
+              num = smp (I) - smp (I-1) - dzq
               qin (I) = -hk (I-1) * num / den
               dqidw0 (I) = -(-hk(I-1) * dsmpdw (I-1) + &
                            num * dhkdw (I-1)) / den
@@ -621,7 +773,8 @@ REAL, PARAMETER :: watmin = 0.01
               !--------------------------------------------------------!
 
               !--------------------------------------------------------!
-              rmx (I) = qin (I) - qout (I)
+              rmx (I) = qin (I) - qout (I) - qflx_tran_veg_col * &
+                        rootr_col (I,x,y)
               amx (I) = -dqidw0 (I)
               bmx (I) = dz (I) / dt - dqidw1 (I) + dqodw1 (I)
               cmx (I) = dqodw2 (I)
@@ -804,7 +957,7 @@ REAL, PARAMETER :: watmin = 0.01
               !--------------------------------------------------------!
               qcharge_tot = qcharge * dt
               !--------------------------------------------------------!
-              IF (qcharge_tot > 0.0) THEN ! Rising water table.
+              IF (qcharge_tot > zero) THEN ! Rising water table.
                 DO I = jwt+1, 1, -1
                   ! Use analytical expression for specific yield.
                   s_y = theta_s (I,x,y) * (one - (one + zwtmm &
@@ -1055,7 +1208,7 @@ REAL, PARAMETER :: watmin = 0.01
             ! shows up as excess drainage to the ocean, take it back out
             ! of drainage.
             !----------------------------------------------------------!
-            rsub_top = rsub_top - xs / dt
+            rsub_top = rsub_top - xs / dt !****
             !----------------------------------------------------------!
 
 !**********************************************************************!
@@ -1065,7 +1218,8 @@ REAL, PARAMETER :: watmin = 0.01
             !----------------------------------------------------------!
             ! Sum all losses from soil column (mm).
             !----------------------------------------------------------!
-            w1 = ((1.0 - frac_h2osfc) * (qflx_surf + qflx_evap_grnd) + &
+            w1 = ((1.0 - frac_h2osfc) * (qflx_surf + qflx_evap_grnd &
+                 + qflx_tran_veg_col) + &
                  rsub_top + qflx_rsub_sat) * dt + wa (x,y)
             !----------------------------------------------------------!
             DO I = 1, nlayers
@@ -1103,15 +1257,18 @@ REAL, PARAMETER :: watmin = 0.01
               WRITE (*,*) 'SUM(rnff)  = ',dt*SUM (rnff(1:nlayers+1))
               WRITE (*,*) 'qflx_surf qflx_evap_grnd = ',&
                           dt*qflx_surf,dt*qflx_evap_grnd
+              WRITE (*,*) 'qflx_tran_veg_col= ',dt*qflx_tran_veg_col
               WRITE (*,*) 'qout (nlayers) = ',qout(nlayers)*dt
               WRITE (*,*) 'zwt = ',zwt(x,y)
               WRITE (*,*) 'qcharge = ',qcharge*dt
               WRITE (*,*) 'pr = ',dt*pr(x,y,iT)
+              WRITE (*,*) 'forc_rain = ',dt*forc_rain
               WRITE (*,*) 'beta = ',beta
               WRITE (*,*) 'wa   =',wa(x,y)
-              WRITE (*,*) 'theta theta_m h2osoi_liq'
+              WRITE (*,*) 'theta theta_m h2osoi_liq h2osoi_liq_ma'
               DO I = 1, nlayers
-                WRITE (*,*) I,theta(I),theta_m(I,x,y),h2osoi_liq (I,x,y)
+                WRITE (*,*) I,theta(I),theta_m(I,x,y), &
+                            h2osoi_liq (I,x,y),h2osoi_liq_ma (I,x,y)
               END DO
               STOP
             END IF ! (ABS (w1 - w0) > 0.1)
@@ -1124,7 +1281,6 @@ REAL, PARAMETER :: watmin = 0.01
             !----------------------------------------------------------!
             rnf_sum  = rnf_sum  + qflx_surf * dt !********************
             rnf_sum = rnf_sum + rsub_top * dt !**********************
-            evap_sum = evap_sum + qflx_evap_grnd
             !----------------------------------------------------------!
 
 !----------------------------------------------------------------------!

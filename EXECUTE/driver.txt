@@ -1,16 +1,20 @@
-'/scratch/adf10/HYBRID9/OUTPUT/I' ! Path for output
+'/scratch/adf10/HYBRID9/OUTPUT/J' ! Path for output
 48  ! NISURF     (surface timesteps per day; 48 == 1800 s/dt)
-.F. ! Use PGF forcing (PGF)?
+.T. ! Use PGF forcing (PGF)?
  1  ! iDEC_start ( 1 = 1901-1910)
  1  ! iDEC_end   (11 = 2001-2010; 12 = 2011-2012)
-.T. ! INTERACTIVE (following options only operate if .TRUE.)
-  .T.         ! Local climate (LCLIM)?
-  'LCLIM/climate_US-Var.csv' ! Local climate filename ().
- 00.0         ! lon_w
- 52.5         ! lat_w
+.F. ! INTERACTIVE (following options only operate if .TRUE.)
+  .F.         ! Local climate (LCLIM)?
+  'LCLIM/climate_US-Var_new.csv' ! Local clm filename  (LCLIM_filename)
+  'LCLIM/US-Var_soil.csv'        ! Local soil filename (LSOIL_filename)
+  2002                          ! First year in local climate file (syr)
+  2003                          ! Last year in local climate file (eyr)
+    10                          ! No. years to spin-up (NYR_SPIN_UP)
+-120.95       ! Local longitude (lon_w)
+  38.41       ! Local latitude  (lat_w)
    1          ! lon_c_w (count towards east)
    1          ! lat_c_w (count towards south)
-    0.0 ! zi (0)
+    0.0 ! Soil interface depth (zi (0)).
    45.0
    91.0
   166.0
@@ -22,6 +26,10 @@
  5000.0 ! zi (9) To make an aquifer.
 
 ! Notes
+  !--------------------------------------------------------------------!
+  ! Vaira Ranch
+  lon_w = -120.951
+  lat_w =   38.407
   !--------------------------------------------------------------------!
   ! Sarawak problem point.
   lon_w = 113.0

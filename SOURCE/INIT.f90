@@ -17,6 +17,10 @@ IMPLICIT NONE
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
+REAL :: decay ! For rooting.
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
 ! Initialise MPI.
 !----------------------------------------------------------------------!
 CALL MPI_INIT (ierr)
@@ -44,6 +48,12 @@ WRITE (*,*) 'num_procs, my_id ',num_procs,my_id
 ! Do some diagnostics for establishing run time on processors.
 !----------------------------------------------------------------------!
 CALL CPU_TIME (start (my_id+1))
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Specific leaf area for each GPT                           (m^2/kg[DM])
+!----------------------------------------------------------------------!
+ALLOCATE (sla (nGPTs))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -103,6 +113,11 @@ ALLOCATE (zq     (nsoil_layers_max+1)) ! Eqm. water potentials      (mm)
 !----------------------------------------------------------------------!
 ALLOCATE (theta (nsoil_layers_max))
 !----------------------------------------------------------------------!
+! Volumetric soil water content in macropores                (mm^3/mm^3)
+!----------------------------------------------------------------------!
+ALLOCATE (theta_ma (nsoil_layers_max))
+!----------------------------------------------------------------------!
+ALLOCATE (S (nsoil_layers_max))
 ! Equilibrium volumetric soil water (mm^3/mm^3).
 !----------------------------------------------------------------------!
 ALLOCATE (vol_eq (nsoil_layers_max+1))
@@ -129,6 +144,14 @@ END DO
 DO y = 1, NY
   lat_all (y) = 89.75 - (y - 1) * 0.5
 END DO
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Set GPT parameters.
+!----------------------------------------------------------------------!
+! Following for beech from Bouriaud et al., 2003, CJRS 29, 371-380.
+!----------------------------------------------------------------------!
+sla (1) = 23.0E-3 ! Specific leaf area (m^2/g[DM])
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -164,6 +187,10 @@ IF (file_free == 1) THEN
   READ (10,*) INTERACTIVE
   READ (10,*) LCLIM
   READ (10,*) LCLIM_filename
+  READ (10,*) LSOIL_filename
+  READ (10,*) syr
+  READ (10,*) eyr
+  READ (10,*) NYR_SPIN_UP
   READ (10,*) lon_w
   READ (10,*) lat_w
   READ (10,*) lon_c_w
@@ -180,8 +207,9 @@ IF (file_free == 1) THEN
 !----------------------------------------------------------------------!
 END IF
 !----------------------------------------------------------------------!
+
 !----------------------------------------------------------------------!
-! Set integration timestep                                           (s)
+! Set sub-daily integration timestep                                 (s)
 !----------------------------------------------------------------------!
 dt = 86400.0 / FLOAT (NISURF)
 !----------------------------------------------------------------------!
@@ -197,7 +225,7 @@ IF (INTERACTIVE) THEN
   a_lon = 1.0 - b_lon * (-179.75)
   b_lat = (360.0 - 1.0) / (-89.75 - 89.75)
   a_lat = 360.0 - b_lat * (-89.75)
-  WRITE (*,*) 'Details of focus point'
+  WRITE (*,*) 'Details of focus point',lon_w,lat_w
   write (*,*) a_lon + b_lon * lon_w
   write (*,*) NINT (a_lon + b_lon * lon_w)
   lon_s_w = NINT (a_lon + b_lon * lon_w)
@@ -268,14 +296,24 @@ END IF
 !----------------------------------------------------------------------!
 ! Allocate array chunks.
 !----------------------------------------------------------------------!
-! Plant mass       
+! Plant mass
 !----------------------------------------------------------------------!
 ALLOCATE (plant_mass   (nplants_max,lon_c,lat_c)) ! Plant mass   (g[DM])
+! Plant foliage mass (g[DM]).
+ALLOCATE (plant_foliage_mass (nplants_max,lon_c,lat_c))
 ALLOCATE (plant_length (nplants_max,lon_c,lat_c)) ! Plant length    (mm)
+ALLOCATE (rdepth       (nplants_max,lon_c,lat_c)) ! Rooting depth   (mm)
 ALLOCATE (C_labile     (nplants_max,lon_c,lat_c)) ! Labile C      (g[C])
 ALLOCATE (N_labile     (nplants_max,lon_c,lat_c)) ! Labile N      (g[N])
 ALLOCATE (P_labile     (nplants_max,lon_c,lat_c)) ! Labile P      (g[P])
-ALLOCATE (nplants (lon_c,lat_c)) ! Number plants per grid-box        (-)
+!----------------------------------------------------------------------!
+ALLOCATE (nplants    (lon_c,lat_c)) ! Number plants per grid-box     (-)
+ALLOCATE (LAI        (lon_c,lat_c)) ! Leaf area index          (m^2/m^2)
+ALLOCATE (LAI_litter (lon_c,lat_c)) ! LAI of litter            (m^2/m^2)
+!----------------------------------------------------------------------!
+! Effective root fraction in each soil layer                         (-)
+!----------------------------------------------------------------------!
+ALLOCATE (rootr_col (1:Nlevgrnd,lon_c,lat_c))
 !----------------------------------------------------------------------!
 ALLOCATE (data_in_2DI (lon_c,lat_c))  ! Generic 2D input integer array.
 ALLOCATE (soil_tex    (lon_c,lat_c))  ! HWSD soil textures           (-)
@@ -287,6 +325,8 @@ ALLOCATE (block_sub   (lon_c,lat_c))  ! Processor IDs.
 ALLOCATE (axy_npp     (lon_c,lat_c,NYR)) ! Total ann. NPP (g[DM]/m^2/yr)
 ALLOCATE (axy_plant_mass (lon_c,lat_c,NYR)) ! Mean ann. pl. mass (g[DM])
 ALLOCATE (axy_tas     (lon_c,lat_c,NYR)) ! Mean annual tas           (K)
+ALLOCATE (axy_rlds    (lon_c,lat_c,NYR)) ! Mean annual rlds      (W/m^2)
+ALLOCATE (axy_rsds    (lon_c,lat_c,NYR)) ! Mean annual rsds      (W/m^2)
 ALLOCATE (axy_huss    (lon_c,lat_c,NYR)) ! Mean annual huss      (kg/kg)
 ALLOCATE (axy_ps      (lon_c,lat_c,NYR)) ! Mean annual ps           (Pa)
 ALLOCATE (axy_pr      (lon_c,lat_c,NYR)) ! Mean annual pr     (kg/m^2/s)
@@ -303,7 +343,8 @@ ALLOCATE (axy_evap    (lon_c,lat_c,NYR)) ! Mean annual evap.      (mm/s)
 !----------------------------------------------------------------------!
 ! Liquid soil water mass                                        (kg/m^2)
 !----------------------------------------------------------------------!
-ALLOCATE (h2osoi_liq (nsoil_layers_max,lon_c,lat_c))
+ALLOCATE (h2osoi_liq    (nsoil_layers_max,lon_c,lat_c)) ! Micropores.
+ALLOCATE (h2osoi_liq_ma (nsoil_layers_max,lon_c,lat_c)) ! Macropores.
 !----------------------------------------------------------------------!
 ! Water table depth                                                  (m)
 !----------------------------------------------------------------------!
@@ -330,7 +371,8 @@ ALLOCATE (psi_s_l1     (lon_c,lat_c))                             ! (cm)
 !----------------------------------------------------------------------!
 ! Chunk of saturated volumetric soil water                   (cm^3/cm^3)
 !----------------------------------------------------------------------!
-ALLOCATE (theta_s (nsoil_layers_max,lon_c,lat_c))
+ALLOCATE (theta_s    (nsoil_layers_max,lon_c,lat_c)) ! Micropores
+ALLOCATE (theta_ma_s (nsoil_layers_max,lon_c,lat_c)) ! Macropores.
 !----------------------------------------------------------------------!
 ! Chunk of saturated soil hydraulic conductivity                  (mm/s)
 !----------------------------------------------------------------------!
@@ -354,14 +396,16 @@ ALLOCATE (theta_m (nsoil_layers_max,lon_c,lat_c))
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
-! Initialise global diagnostic arrays with fill (i.e. NaN and zero)
-! values.
+! Initialise global diagnostic arrays with fill values (i.e. NaN and
+! zero).
 !----------------------------------------------------------------------!
 axy_npp        (:,:,:) = zero / zero
 axy_plant_mass (:,:,:) = zero / zero
 axy_rnf   (:,:,:) = zero / zero
 axy_evap  (:,:,:) = zero / zero
 axy_tas   (:,:,:) = zero / zero
+axy_rlds  (:,:,:) = zero / zero
+axy_rsds  (:,:,:) = zero / zero
 axy_huss  (:,:,:) = zero / zero
 axy_ps    (:,:,:) = zero / zero
 axy_pr    (:,:,:) = zero / zero
@@ -571,6 +615,10 @@ DO I = 1, nsoil_layers_max ! Loop over soil layers
       lambda  (I,x,y) = lambda_l1 (x,y) / 1.0E3
       psi_s   (I,x,y) = 10.0 * psi_s_l1 (x,y)
       !----------------------------------------------------------------!
+      ! Set macropore thetas from BG81.
+      !----------------------------------------------------------------!
+      theta_ma_s (I,x,y) = 0.1 ! Macroporosity.
+      !----------------------------------------------------------------!
       ! To stop potential dbz.
       !----------------------------------------------------------------!
       lambda  (I,x,y) = MAX (lambda (I,x,y), trunc)
@@ -656,14 +704,15 @@ CALL WRITE_NET_CDF_3DR_soils
 ! Not sure if this is the amount that would stop flow - too high?
 ! Also set water table depth and aquifer water as in CESM.
 !----------------------------------------------------------------------!
-theta_m    (:,:,:) = zero
-h2osoi_liq (:,:,:) = zero
-plant_mass (:,:,:) = zero
-C_labile   (:,:,:) = zero
-N_labile   (:,:,:) = zero
-P_labile   (:,:,:) = zero
-zwt (:,:) = zero
-wa  (:,:) = zero
+theta_m       (:,:,:) = zero
+h2osoi_liq    (:,:,:) = zero
+h2osoi_liq_ma (:,:,:) = zero
+plant_mass    (:,:,:) = zero
+C_labile      (:,:,:) = zero
+N_labile      (:,:,:) = zero
+P_labile      (:,:,:) = zero
+zwt           (:,:) = zero
+wa            (:,:) = zero
 nlayers = nsoil_layers_max
 DO y = 1, lat_c
   DO x = 1, lon_c
@@ -678,8 +727,10 @@ DO y = 1, lat_c
         !--------------------------------------------------------------!
         ! Initial liquid water in each soil layer (kg/m^2).
         !--------------------------------------------------------------!
-        h2osoi_liq (I,x,y) = 0.5 * theta_s (I,x,y) * dz (I) * rhow &
+        h2osoi_liq (I,x,y) = 0.4 * theta_s (I,x,y) * dz (I) * rhow &
                              / 1000.0
+        h2osoi_liq_ma (I,x,y) = 0.4 * theta_ma_s (I,x,y) * dz (I) * &
+                                rhow / 1000.0
         !--------------------------------------------------------------!
       END DO
       !----------------------------------------------------------------!
@@ -692,15 +743,58 @@ DO y = 1, lat_c
       !----------------------------------------------------------------!
       wa (x,y) = 4000.0
       !----------------------------------------------------------------!
+      ! Initial LAI of litter layer                            (m^2/m^2)
+      !----------------------------------------------------------------!
+      LAI_litter (x,y) = 0.001
+      !----------------------------------------------------------------!
       ! Initial number of plants in grid-box                         (-)
       !----------------------------------------------------------------!
       nplants (x,y) = 1
       !----------------------------------------------------------------!
+      ! Initialise LAI of canopy                               (m^2/m^2)
+      !----------------------------------------------------------------!
+      LAI (x,y) = zero
+      !----------------------------------------------------------------!
+      ! Initialise plot relative root distribution over soil layers  (-)
+      !----------------------------------------------------------------!
+      rootr_col (:,x,y) = zero
+      !----------------------------------------------------------------!
       DO K = 1, nplants (x,y)
+        !--------------------------------------------------------------!
+        ! Generalised plant type index                               (-)
+        !--------------------------------------------------------------!
+        iGPT = 1
         !--------------------------------------------------------------!
         ! Initial plant masses                                   (g[DM])
         !--------------------------------------------------------------!
-        plant_mass (K,x,y) = 1.0
+        plant_mass         (K,x,y) = 1.0
+        plant_foliage_mass (K,x,y) = 0.0435 ! LAI = 0.001.
+        !--------------------------------------------------------------!
+        ! Assume all is a cylinder of mass with length, and
+        ! with some portion below-ground                            (mm)
+        !--------------------------------------------------------------!
+        plant_length (K,x,y) = (400.0 * plant_mass (K,x,y) / &
+                               3.142E-3) ** (one / 3.0)
+        !--------------------------------------------------------------!
+        ! Sum foliage area over ind's for total LAI of canopy  (m^2/m^2)
+        !--------------------------------------------------------------!
+        LAI (x,y) = LAI (x,y) + &
+                    plant_foliage_mass (K,x,y) * sla (iGPT) / plot_area
+        !--------------------------------------------------------------!
+        ! Rooting depth                                             (mm)
+        !--------------------------------------------------------------!
+        rdepth (K,x,y) = 0.3 * plant_length (K,x,y)
+        !--------------------------------------------------------------!
+        ! Rooting distribution (based on Baldocchi et al., 2004).
+        ! Assumes 90% of roots are within rdepth.
+        !--------------------------------------------------------------!
+        decay = EXP (LOG (0.1) / (rdepth (K,x,y) / 10.0))
+        !--------------------------------------------------------------!
+        DO I = 1, nlayers
+          rootr_col (I,x,y) = rootr_col (I,x,y) + &
+                      (1.0 - decay ** (zi (I) / 10.0)) - &
+                      (1.0 - decay ** (zi (I-1) / 10.0))
+        END DO
         !--------------------------------------------------------------!
         ! Initial plant labile contents                              (g)
         ! Values as for leaf in Figure 4 of Bell et al., 2013
@@ -712,10 +806,9 @@ DO y = 1, lat_c
         !--------------------------------------------------------------!
       END DO
       !----------------------------------------------------------------!
-      
-    END IF
-  END DO
-END DO
+    END IF ! Soiled with some water capacity.
+  END DO ! x = 1, lon_c
+END DO ! y = 1, lat_c
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
@@ -788,6 +881,75 @@ IF (INTERACTIVE) THEN
   WRITE (*,*) lon
   WRITE (*,*) 'latitudes'
   WRITE (*,*) lat
+!----------------------------------------------------------------------!
+! Open file for daily diagnostics.
+!----------------------------------------------------------------------!
+OPEN (20,FILE='LCLIM/daily_diag.csv',STATUS='UNKNOWN')
+WRITE (20,'(A200)') 'jyear,  DOY,  et,  et_g,  theta_1,  theta_2,  &
+              &theta_3,  theta_4,&
+              &  theta_ma_1,  lai,  lai_litter, w_i, fT'
+!----------------------------------------------------------------------!
+END IF
+
+!----------------------------------------------------------------------!
+IF (.NOT. (PGF)) THEN
+  !--------------------------------------------------------------------!
+  x = 1
+  y = 1
+  nlayers = nsoil_layers_max
+  NTIMES = time_BOY (eyr+1-1859) - time_BOY (syr-1859)
+  ALLOCATE (pr  (lon_c,lat_c,NTIMES))
+  ALLOCATE (tas (lon_c,lat_c,NTIMES))
+  ALLOCATE (rlds(lon_c,lat_c,NTIMES))
+  ALLOCATE (rsds(lon_c,lat_c,NTIMES))
+  ALLOCATE (huss(lon_c,lat_c,NTIMES))
+  ALLOCATE (ps  (lon_c,lat_c,NTIMES))
+  ALLOCATE (rhs (lon_c,lat_c,NTIMES))
+  OPEN (10,FILE=TRIM(LSOIL_filename),STATUS='OLD')
+  READ (10,*)
+  DO I = 1, nlayers
+    READ (10,*) J,hksat(I,x,y),lambda(I,x,y),psi_s(I,x,y),theta_s(I,x,y)
+    bsw (I,x,y) = 1.0E3 / lambda (I,x,y)
+!************************
+! Vaira (very rocky silt loam)
+! work up best esimates
+!bsw (I,x,y) = 3.3
+!bsw (I,x,y) = 6.0
+!bsw (I,x,y) = 2.013! Baldocchi et al. (2004).
+!lambda (I,x,y) = 1.0E3 / bsw (I,x,y)
+!psi_s (I,x,y) = -0.00786 * 10000.0
+!write (*,*) hksat(I,x,y)
+!hksat (I,x,y) = 2.59*10.0E3/3600.0
+!psi_s (I,x,y) = psi_s (I,x,y)
+!theta_s (I,x,y) = theta_s (I,x,y) / 1.4
+!hksat (I,x,y) = hksat (I,x,y) * 0.1
+!theta_s (I,x,y) = 300.0
+!************************
+  END DO
+!theta_s (1,x,y) = 290.0
+!theta_s (2,x,y) = 300.0
+!theta_s (3,x,y) = 300.0
+!theta_s (4,x,y) = 350.0
+  CLOSE (10)
+  hksat   (:,:,:) = hksat   (:,:,:) * 10.0 / 86400.0
+  lambda  (:,:,:) = lambda  (:,:,:) / 1.0E3
+  psi_s   (:,:,:) = psi_s   (:,:,:) * 10.0
+  theta_s (:,:,:) = theta_s (:,:,:) / 1.0E3
+  DO I = 1, nlayers
+    theta_m (I,x,y) = theta_s (I,x,y) * ((-3.1E9 / (1000.0 * 9.8)) &
+                      / psi_s (I,x,y)) ** (-lambda (I,x,y))
+!***************
+!write (*,*) psi_s(I,x,y)
+!psi_s (I,x,y) = -1780.0
+!if (zi (i) > 1000.0) hksat (I,x,y) = hksat (I,x,y) / 100000.0
+!if (zi (i) > 1000.0) hksat (I,x,y) = 0.0
+!hksat (6,x,y) = hksat (6,x,y) / 1000.0 ! rock layer
+!***************
+  END DO
+  LAI = 0.001 !*******************
+  LAI_litter = 0.0 !**********************
+  !--------------------------------------------------------------------!
+
 END IF
 !----------------------------------------------------------------------!
 

@@ -35,6 +35,32 @@ IMPLICIT NONE
   !--------------------------------------------------------------------!
 
   !--------------------------------------------------------------------!
+  ! Read Surface Downwelling Longwave Radiation Flux (W/m^2) for this
+  ! decade and block.
+  !--------------------------------------------------------------------!
+  varid = 4
+  !--------------------------------------------------------------------!
+  file_name = '/scratch/adf10/ISIMIP2/Input_Hist_obs/PGFv2.1/'//&
+              &'rlds_pgfv2.1_'//decade(iDEC)//'.nc4'
+  WRITE (*,*) my_id,'Reading from ',TRIM(file_name)
+  ALLOCATE (rlds(lon_c,lat_c,NTIMES))
+  CALL READ_NET_CDF_3DR (rlds)
+  !--------------------------------------------------------------------!
+
+  !--------------------------------------------------------------------!
+  ! Read Surface Downwelling Shortwave Radiation Flux (W/m^2) for this
+  ! decade and block.
+  !--------------------------------------------------------------------!
+  varid = 4
+  !--------------------------------------------------------------------!
+  file_name = '/scratch/adf10/ISIMIP2/Input_Hist_obs/PGFv2.1/'//&
+              &'rsds_pgfv2.1_'//decade(iDEC)//'.nc4'
+  WRITE (*,*) my_id,'Reading from ',TRIM(file_name)
+  ALLOCATE (rsds(lon_c,lat_c,NTIMES))
+  CALL READ_NET_CDF_3DR (rsds)
+  !--------------------------------------------------------------------!
+
+  !--------------------------------------------------------------------!
   ! Read Specific Humidity at time of Maximum Temperature (kg kg-1)
   ! for this decade and block.
   !--------------------------------------------------------------------!
