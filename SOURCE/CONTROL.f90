@@ -89,8 +89,8 @@ INTEGER :: iDEC              ! Decade index              (1 = 1901-1910)
 INTEGER :: iDEC_start        ! Index of first decade in simulation   (-)
 INTEGER :: iDEC_end          ! Index of last decade in simulation    (-)
 INTEGER :: jyear             ! Calendar year                        (CE)
-INTEGER :: syr               ! First year in decade                 (CE)
-INTEGER :: eyr               ! Last year in decade                  (CE)
+INTEGER :: syr               ! First year in decade/simulation      (CE)
+INTEGER :: eyr               ! Last year in decade/simulation       (CE)
 INTEGER :: I,J,K             ! Generic loop indices                  (-)
 INTEGER :: NISURF            ! No. timepoints in day                 (-)
 INTEGER :: NS                ! Timepoints in day index               (-)
@@ -116,6 +116,18 @@ LOGICAL :: LCLIM ! Climate from local climate file? (logical)
 ! Name of local climate file, if used.
 !----------------------------------------------------------------------!
 CHARACTER (LEN = 200) :: LCLIM_filename
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Name of local soil properties file, if used.
+!----------------------------------------------------------------------!
+CHARACTER (LEN = 200) :: LSOIL_filename
+!----------------------------------------------------------------------!
+
+!----------------------------------------------------------------------!
+! Number of years to spin-up if using local climate                 (yr)
+!----------------------------------------------------------------------!
+INTEGER :: NYR_SPIN_UP
 !----------------------------------------------------------------------!
 
 !----------------------------------------------------------------------!
